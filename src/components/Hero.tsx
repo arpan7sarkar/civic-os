@@ -1,6 +1,53 @@
-import { Search, Sparkles } from "lucide-react";
+"use client";
+
+import { useState } from "react";
+import { Search, Sparkles, Loader2, CheckCircle2 } from "lucide-react";
+import { analyzeComplaint } from "@/lib/ai";
+import { saveComplaint } from "@/lib/store";
+import { AnalysisResult, Complaint } from "@/lib/types";
 
 export default function Hero() {
+    const [description, setDescription] = useState("");
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [result, setResult] = useState<AnalysisResult | null>(null);
+    const [ticketId, setTicketId] = useState<string | null>(null);
+
+    const handleAnalyze = async () => {
+        if (!description.trim()) return;
+
+        setIsAnalyzing(true);
+        setResult(null);
+        setTicketId(null);
+
+        try {
+            const analysis = await analyzeComplaint(description);
+            setResult(analysis);
+
+            const newTicketId = `CIV-${Math.floor(1000 + Math.random() * 9000)}`;
+            setTicketId(newTicketId);
+
+            const newComplaint: Complaint = {
+                id: newTicketId,
+                description,
+                category: analysis.category,
+                priority: analysis.priority,
+                department: analysis.department,
+                lat: 28.6139 + (Math.random() - 0.5) * 0.1, // Random Delhi coords
+                lng: 77.2090 + (Math.random() - 0.5) * 0.1,
+                status: 'Pending',
+                assignedTo: 'Officer Unassigned',
+                createdAt: new Date().toISOString(),
+                ward: 'Ward 104 (Lajpat Nagar)' // Default ward for demo
+            };
+
+            saveComplaint(newComplaint);
+        } catch (error) {
+            console.error("Analysis failed:", error);
+        } finally {
+            setIsAnalyzing(false);
+        }
+    };
+
     return (
         <section className="relative w-full overflow-hidden bg-white">
             {/* Background Pattern */}
@@ -55,14 +102,57 @@ export default function Hero() {
                             <div className="relative mb-4">
                                 <textarea
                                     rows={2}
+                                    value={description}
+                                    onChange={(e) => setDescription(e.target.value)}
                                     className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:border-mcd-navy transition-all resize-none text-gray-700"
                                     placeholder="Tell us what's wrong? e.g., 'Garbage pile at Lajpat Nagar Metro Station' or 'No functional streetlights in Block C, Rohini'"
                                 ></textarea>
                             </div>
-                            <button className="w-full flex items-center justify-center gap-2 bg-mcd-navy/5 text-mcd-navy font-bold py-3 rounded-xl hover:bg-mcd-navy/10 transition-all border border-mcd-navy/20">
-                                <Sparkles className="w-4 h-4 text-mcd-navy" />
-                                Analyze with AI
-                            </button>
+
+                            {!ticketId ? (
+                                <button
+                                    onClick={handleAnalyze}
+                                    disabled={isAnalyzing || !description.trim()}
+                                    className="w-full flex items-center justify-center gap-2 bg-mcd-navy/5 text-mcd-navy font-bold py-4 rounded-xl hover:bg-mcd-navy/10 transition-all border border-mcd-navy/20 disabled:opacity-50"
+                                >
+                                    {isAnalyzing ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                        <Sparkles className="w-4 h-4 text-mcd-navy" />
+                                    )}
+                                    {isAnalyzing ? "Analyzing Complaint..." : "Analyze with AI"}
+                                </button>
+                            ) : (
+                                <div className="p-4 bg-green-50 border border-green-100 rounded-xl animate-in fade-in slide-in-from-bottom-2">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center gap-2 text-green-700">
+                                            <CheckCircle2 className="w-5 h-5" />
+                                            <span className="text-sm font-bold uppercase tracking-wider">Ticket Generated</span>
+                                        </div>
+                                        <span className="text-xs font-black text-green-800">{ticketId}</span>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <div className="bg-white p-2 rounded-lg border border-green-100">
+                                            <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">Category</p>
+                                            <p className="text-[10px] font-black text-mcd-navy">{result?.category}</p>
+                                        </div>
+                                        <div className="bg-white p-2 rounded-lg border border-green-100">
+                                            <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">Priority</p>
+                                            <p className="text-[10px] font-black text-mcd-navy">{result?.priority}</p>
+                                        </div>
+                                        <div className="bg-white p-2 rounded-lg border border-green-100">
+                                            <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">Dept</p>
+                                            <p className="text-[10px] font-black text-mcd-navy">{result?.department}</p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        onClick={() => { setTicketId(null); setDescription(""); }}
+                                        className="w-full mt-4 text-[10px] font-bold text-green-700 uppercase tracking-widest hover:underline"
+                                    >
+                                        Report another issue
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

@@ -1,7 +1,16 @@
+"use client";
+
 import Link from "next/link";
-import { User, Search } from "lucide-react";
+import { User, Search, PlayCircle } from "lucide-react";
+import { generateDemoData } from "@/lib/store";
 
 export default function Header() {
+    const handleDemoMode = () => {
+        generateDemoData();
+        alert("Demo data generated! Refreshing page...");
+        window.location.reload();
+    };
+
     return (
         <header className="w-full flex flex-col">
             {/* Top Official Bar */}
@@ -39,7 +48,15 @@ export default function Header() {
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={handleDemoMode}
+                            className="hidden md:flex items-center gap-2 px-3 py-2 bg-mcd-navy/5 text-mcd-navy text-xs font-black rounded-lg hover:bg-mcd-navy/10 transition-all uppercase tracking-widest"
+                        >
+                            <PlayCircle className="w-4 h-4" />
+                            Demo Mode
+                        </button>
+
                         <button className="p-2 text-mcd-slate hover:text-mcd-navy transition-colors md:hidden">
                             <Search className="w-5 h-5" />
                         </button>
@@ -48,7 +65,7 @@ export default function Header() {
                             className="flex items-center gap-2 px-4 py-2 border-2 border-mcd-navy text-mcd-navy text-sm font-bold rounded-md hover:bg-mcd-navy hover:text-white transition-all duration-200"
                         >
                             <User className="w-4 h-4" />
-                            <span>Login / Register</span>
+                            <span className="hidden sm:inline">Login</span>
                         </Link>
                     </div>
                 </div>
