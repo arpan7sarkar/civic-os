@@ -3,15 +3,15 @@ import { Client, Account, Databases, Storage } from 'appwrite';
 const client = new Client();
 
 client
-    .setEndpoint('https://sgp.cloud.appwrite.io/v1')
-    .setProject('69b02bf0001038d5437c');
+    .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || 'https://cloud.appwrite.io/v1')
+    .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || '');
 
 export const account = new Account(client);
 export const databases = new Databases(client);
 export const storage = new Storage(client);
 
-export const DATABASE_ID = 'user_profiles';
-export const PROFILES_COLLECTION_ID = 'user_profiles'; 
-export const PROFILE_IMAGES_BUCKET_ID = '69b313a3001da90f7d33'; 
+export const DATABASE_ID = process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID || 'user_profiles';
+export const PROFILES_COLLECTION_ID = process.env.NEXT_PUBLIC_APPWRITE_PROFILES_COLLECTION_ID || 'user_profiles'; 
+export const PROFILE_IMAGES_BUCKET_ID = process.env.NEXT_PUBLIC_APPWRITE_PROFILE_IMAGES_BUCKET_ID || '';
 
 export { client };

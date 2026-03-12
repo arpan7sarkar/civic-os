@@ -16,7 +16,7 @@ import {
     ShieldCheck
 } from "lucide-react";
 import Link from "next/link";
-import { analyzeIssue } from "@/lib/gemini";
+import { analyzeIssueAction } from "@/app/actions/ai";
 import { saveComplaint, getComplaints } from "@/lib/store";
 import { getCurrentUserProfile } from "@/lib/profiles";
 import { ComplaintCategory, Priority } from "@/lib/types";
@@ -55,7 +55,7 @@ export default function ReportPage() {
         if (!description.trim()) return;
         setIsAnalyzing(true);
         try {
-            const result = await analyzeIssue(description);
+            const result = await analyzeIssueAction(description);
             setAiResult(result);
             setStep(2);
         } catch (err) {

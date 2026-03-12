@@ -37,8 +37,7 @@ import { account } from "@/lib/appwrite";
 import { getCurrentUserProfile, UserProfile } from "@/lib/profiles";
 import { getComplaints, updateComplaint, getStats } from "@/lib/store";
 import { Complaint } from "@/lib/types";
-import { analyzeIssue } from "@/lib/gemini";
-import { transcribeAudio, textToSpeech } from "@/lib/sarvam";
+import { analyzeIssueAction, transcribeAudioAction, textToSpeechAction } from "@/app/actions/ai";
 import { generateGrievancePDF } from "@/lib/pdf";
 
 export default function CitizenDashboard() {
@@ -70,7 +69,7 @@ export default function CitizenDashboard() {
                 setIsRecording(false);
                 setVoiceFeedback("Transcribing: 'Summarize pending water leakages'...");
                 try {
-                    await textToSpeech("Summarizing pending water leakage reports for South Delhi.");
+                    await textToSpeechAction("Summarizing pending water leakage reports for South Delhi.");
                 } catch (err) {
                     console.error("TTS Error:", err);
                 }
@@ -106,7 +105,7 @@ export default function CitizenDashboard() {
                 // Perform initial load
                 const currentComplaints = getComplaints(profile.userId);
                 if (currentComplaints.length > 0) {
-                    const insight = await analyzeIssue(currentComplaints[0].description);
+                    const insight = await analyzeIssueAction(currentComplaints[0].description);
                     setAiInsight(insight);
                 }
                 await loadData(profile.userId);

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Search, Sparkles, Loader2, CheckCircle2 } from "lucide-react";
-import { analyzeComplaint } from "@/lib/ai";
+import { analyzeIssueAction } from "@/app/actions/ai";
 import { saveComplaint } from "@/lib/store";
 import { AnalysisResult, Complaint } from "@/lib/types";
 
@@ -20,7 +20,7 @@ export default function Hero() {
         setTicketId(null);
 
         try {
-            const analysis = await analyzeComplaint(description);
+            const analysis = await analyzeIssueAction(description);
             setResult(analysis);
 
             const newTicketId = `CIV-${Math.floor(1000 + Math.random() * 9000)}`;
