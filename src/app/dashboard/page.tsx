@@ -34,7 +34,8 @@ import {
     FileDown
 } from "lucide-react";
 import { logoutAction } from "@/app/actions/auth";
-import { getServerProfileAction, UserProfile } from "@/app/actions/profile";
+import { getServerProfileAction, UserProfile, updateUserProfileAction } from "@/app/actions/profile";
+import { reverseGeocodeAction } from "@/app/actions/geo";
 import { getComplaints, updateComplaint, getStats } from "@/lib/store";
 import { Complaint } from "@/lib/types";
 import { analyzeIssueAction, transcribeAudioAction, textToSpeechAction } from "@/app/actions/ai";
@@ -53,31 +54,94 @@ export default function CitizenDashboard() {
     });
     const [isLoading, setIsLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [searchTerm, setSearchTerm] = useState("");
     const [activeZone, setActiveZone] = useState("South Delhi");
     const [aiInsight, setAiInsight] = useState<any>(null);
+
+    // Menu States
+    const [showZoneMenu, setShowZoneMenu] = useState(false);
+    const [showProfileMenu, setShowProfileMenu] = useState(false);
+    const [showNotifications, setShowNotifications] = useState(false);
+
+    // Profile Modal States
+    const [showMyProfileModal, setShowMyProfileModal] = useState(false);
+    const [showUpdateProfileModal, setShowUpdateProfileModal] = useState(false);
+    const [profileFormData, setProfileFormData] = useState({
+        email: "",
+        address: ""
+    });
+    const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
     
     // Voice Assist State
     const [isRecording, setIsRecording] = useState(false);
-    const [voiceFeedback, setVoiceFeedback] = useState("");
+    const [isSpeaking, setIsSpeaking] = useState(false);
+
+    const playAudio = (base64: string) => {
+        const audio = new Audio(`data:audio/wav;base64,${base64}`);
+        audio.onplay = () => setIsSpeaking(true);
+        audio.onended = () => setIsSpeaking(false);
+        audio.play().catch(e => console.error("Audio Play Error:", e));
+    };
 
     const handleVoiceAssist = async () => {
-        if (!isRecording) {
-            setIsRecording(true);
-            setVoiceFeedback("Listening for instructions...");
-            // In a real environment, we'd use MediaRecorder here.
-            setTimeout(async () => {
-                setIsRecording(false);
-                setVoiceFeedback("Transcribing: 'Summarize pending water leakages'...");
-                try {
-                    await textToSpeechAction("Summarizing pending water leakage reports for South Delhi.");
-                } catch (err) {
-                    console.error("TTS Error:", err);
-                }
-            }, 3000);
+        if (isSpeaking) return;
+        setIsRecording(true);
+        // Correct interpolation for user profile name
+        const summaryText = `नमस्ते ${userProfile?.name || 'citizen'}. आपके पास ${stats.pendingReports} लंबित शिकायतें हैं। आपकी कचरा संग्रहण की शिकायत पर कार्रवाई की जा रही है।`;
+        
+        try {
+            const audios = await textToSpeechAction(summaryText, "shubh", "hi-IN");
+            if (audios && audios.length > 0) {
+                playAudio(audios[0]);
+            }
+        } catch (err) {
+            console.error("Voice Assist Error:", err);
+        } finally {
+            setIsRecording(false);
         }
     };
 
-    const [searchTerm, setSearchTerm] = useState("");
+    const handleGrievanceVoice = async (complaint: Complaint) => {
+        if (isSpeaking) return;
+        const statusText = `शिकायत संख्या ${complaint.id} की स्थिति ${complaint.status === 'Pending' ? 'लंबित' : complaint.status === 'In Progress' ? 'प्रगति पर' : 'पूर्ण'} है। इसे ${complaint.assignedTo || 'संबद्ध विभाग'} को सौंपा गया है।`;
+        
+        try {
+            const audios = await textToSpeechAction(statusText, "shubh", "hi-IN");
+            if (audios && audios.length > 0) {
+                playAudio(audios[0]);
+            }
+        } catch (err) {
+            console.error("Grievance Voice Error:", err);
+        }
+    };
+
+    const [lat, setLat] = useState<number | null>(null);
+    const [lng, setLng] = useState<number | null>(null);
+    const [currentAddress, setCurrentAddress] = useState<string | null>(null);
+
+    const handleLocationTrack = () => {
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+                const { latitude, longitude } = pos.coords;
+                setLat(latitude);
+                setLng(longitude);
+                
+                try {
+                    const res = await reverseGeocodeAction(latitude, longitude);
+                    if (res.success && res.address) {
+                        setCurrentAddress(res.address);
+                    }
+                } catch (err) {
+                    console.warn("Address lookup failed:", err);
+                }
+            }, (err) => console.warn("Location tracking failed:", err));
+        }
+    };
+
+    useEffect(() => {
+        // Initial coordinate track
+        handleLocationTrack();
+    }, []);
 
     const loadData = async (uid: string) => {
         const allComplaints = getComplaints(uid);
@@ -198,6 +262,31 @@ export default function CitizenDashboard() {
         }
     }, [searchTerm, userProfile]);
 
+    const handleUpdateProfile = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!userProfile) return;
+        
+        setIsUpdatingProfile(true);
+        try {
+            const res = await updateUserProfileAction({
+                userId: userProfile.userId,
+                email: profileFormData.email,
+                address: profileFormData.address
+            });
+            
+            if (res.success && res.profile) {
+                setUserProfile(res.profile);
+                setShowUpdateProfileModal(false);
+            } else {
+                alert("Failed to update profile: " + res.error);
+            }
+        } catch (err) {
+            console.error("Update Profile Error:", err);
+        } finally {
+            setIsUpdatingProfile(false);
+        }
+    };
+
     const handleLogout = async () => {
         try {
             await logoutAction();
@@ -241,13 +330,13 @@ export default function CitizenDashboard() {
                 </div>
 
                 <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-                    <SidebarLink icon={<LayoutGrid className="w-4 h-4" />} label="Overview" active />
-                    <SidebarLink icon={<FileText className="w-4 h-4" />} label="My Reports" />
-                    <SidebarLink icon={<MapIcon className="w-4 h-4" />} label="Local Map" />
-                    <SidebarLink icon={<ShieldAlert className="w-4 h-4" />} label="Emergency" />
+                    <SidebarLink icon={<LayoutGrid className="w-4 h-4" />} label="Overview" href="/dashboard" active />
+                    <SidebarLink icon={<FileText className="w-4 h-4" />} label="My Reports" href="/dashboard" />
+                    <SidebarLink icon={<MapIcon className="w-4 h-4" />} label="Local Map" href="/map" />
+                    <SidebarLink icon={<ShieldAlert className="w-4 h-4" />} label="Emergency" href="/dashboard" />
                     
                     <div className="pt-8 pb-2 px-4 text-[10px] font-black text-slate-300 uppercase tracking-widest">Support</div>
-                    <SidebarLink icon={<Settings className="w-4 h-4" />} label="Preferences" />
+                    <SidebarLink icon={<Settings className="w-4 h-4" />} label="Preferences" href="/dashboard" />
                 </nav>
 
                 <div className="p-4 border-t border-slate-50">
@@ -272,44 +361,130 @@ export default function CitizenDashboard() {
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
                         </div>
-                        <div className="h-6 w-px bg-slate-200 mx-2" />
-                        <div className="flex items-center gap-2 text-slate-500 hover:text-gov-blue cursor-pointer transition-colors px-3 py-2 rounded-xl border border-transparent hover:border-slate-100">
-                            <MapPin className="w-4 h-4" />
-                            <span className="text-sm font-bold">Zone: {activeZone}</span>
-                            <ChevronDown className="w-4 h-4" />
+                        <div className="relative group">
+                            <div 
+                                onClick={() => setShowZoneMenu(!showZoneMenu)}
+                                className="flex items-center gap-2 text-slate-500 hover:text-gov-blue cursor-pointer transition-colors px-3 py-2 rounded-xl border border-transparent hover:border-slate-100"
+                            >
+                                <div className="flex flex-col items-start">
+                                    <div className="flex items-center gap-1">
+                                        <span className="text-[10px] font-black text-slate-800 uppercase tracking-widest">{activeZone}</span>
+                                        <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${showZoneMenu ? 'rotate-180' : ''}`} />
+                                    </div>
+                                    {currentAddress && <span className="text-[8px] font-bold text-slate-400 truncate max-w-[100px]">{currentAddress}</span>}
+                                </div>
+                            </div>
+                            
+                            {showZoneMenu && (
+                                <div className="absolute top-full left-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 animate-in fade-in slide-in-from-top-2">
+                                    {["South Delhi", "North Delhi", "East Delhi", "West Delhi", "Central Delhi"].map((zone) => (
+                                        <button
+                                            key={zone}
+                                            onClick={() => {
+                                                setActiveZone(zone);
+                                                setShowZoneMenu(false);
+                                                handleLocationTrack();
+                                            }}
+                                            className="w-full text-left px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-gov-blue transition-colors"
+                                        >
+                                            {zone}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
 
                     <div className="flex items-center gap-6">
                         <button 
                             onClick={handleVoiceAssist}
-                            className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${isRecording ? 'bg-red-50 border-red-200 text-red-600 animate-pulse' : 'bg-white border-slate-100 text-gov-blue hover:bg-slate-50'}`}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${isRecording || isSpeaking ? 'bg-gov-blue/5 border-gov-blue/20 text-gov-blue animate-pulse' : 'bg-white border-slate-100 text-gov-blue hover:bg-slate-50'}`}
                         >
-                            {isRecording ? <Mic className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                            <span className="text-xs font-black uppercase tracking-widest">{isRecording ? "Listening..." : "Voice Assist"}</span>
+                            {isRecording || isSpeaking ? <Mic className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                            <span className="text-xs font-black uppercase tracking-widest">{isRecording ? "Listening..." : isSpeaking ? "Speaking..." : "Voice Assist"}</span>
                         </button>
 
-                        <div className="relative cursor-pointer hover:bg-slate-100 p-2 rounded-xl transition-colors">
-                            <Bell className="w-5 h-5 text-slate-500" />
-                            <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
+                        <div className="relative">
+                            <div 
+                                onClick={() => setShowNotifications(!showNotifications)}
+                                className="cursor-pointer hover:bg-slate-100 p-2 rounded-xl transition-colors"
+                            >
+                                <Bell className="w-5 h-5 text-slate-500" />
+                                <span className="absolute top-2 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
+                            </div>
+
+                            {showNotifications && (
+                                <div className="absolute top-full right-0 mt-2 w-72 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
+                                    <div className="p-4 border-b border-slate-50 bg-slate-50/50">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Recent Notifications</p>
+                                    </div>
+                                    <div className="max-h-64 overflow-y-auto">
+                                        <div className="p-4 border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                                            <p className="text-xs font-bold text-slate-800">Garbage Collection Alert</p>
+                                            <p className="text-[10px] text-slate-500 mt-1">Your area (Ward 88) has a scheduled cleanup at 10:00 AM tomorrow.</p>
+                                        </div>
+                                        <div className="p-4 border-b border-slate-50 hover:bg-slate-50 transition-colors">
+                                            <p className="text-xs font-bold text-slate-800">Status Update: #CIV-878564</p>
+                                            <p className="text-[10px] text-slate-500 mt-1">Your complaint has been assigned to a Field Officer.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
-                        <div className="flex items-center gap-3 pl-4 border-l border-slate-200">
+
+                        <div className="relative flex items-center gap-3 pl-4 border-l border-slate-200">
                             <div className="text-right">
                                 <p className="text-sm font-black text-slate-800 leading-none">{userProfile?.name || "Citizen"}</p>
-                                <p className="text-[10px] text-slate-400 font-bold mt-1">Resident - {activeZone}</p>
+                                <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-widest leading-none">Resident • {activeZone}</p>
                             </div>
-                            <div className="w-10 h-10 rounded-xl overflow-hidden shadow-md">
-                                {userProfile?.profileImageUrl ? (
-                                    <img src={userProfile.profileImageUrl} alt="Avatar" className="w-full h-full object-cover" />
-                                ) : (
-                                    <div className="w-full h-full bg-slate-200 flex items-center justify-center text-slate-400">
-                                        <User className="w-6 h-6" />
+                            <div className="relative">
+                                <div 
+                                    onClick={() => setShowProfileMenu(!showProfileMenu)}
+                                    className="w-10 h-10 rounded-xl overflow-hidden shadow-md cursor-pointer hover:ring-4 hover:ring-gov-blue/10 transition-all active:scale-95"
+                                >
+                                    {userProfile?.profileImageUrl ? (
+                                        <img src={userProfile.profileImageUrl} alt="Avatar" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="w-full h-full bg-slate-200 flex items-center justify-center text-slate-400">
+                                            <User className="w-6 h-6" />
+                                        </div>
+                                    )}
+                                </div>
+
+                                {showProfileMenu && (
+                                    <div className="absolute top-full right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 animate-in fade-in slide-in-from-top-2">
+                                        <button 
+                                            onClick={() => {
+                                                setShowMyProfileModal(true);
+                                                setShowProfileMenu(false);
+                                            }}
+                                            className="w-full text-left px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors flex items-center gap-2"
+                                        >
+                                            <User className="w-3 h-3" /> My Profile
+                                        </button>
+                                        <button 
+                                            onClick={() => {
+                                                setProfileFormData({
+                                                    email: userProfile?.email || "",
+                                                    address: userProfile?.address || ""
+                                                });
+                                                setShowUpdateProfileModal(true);
+                                                setShowProfileMenu(false);
+                                            }}
+                                            className="w-full text-left px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors flex items-center gap-2"
+                                        >
+                                            <Settings className="w-3 h-3" /> Update Profile
+                                        </button>
+                                        <div className="h-px bg-slate-50 my-1" />
+                                        <button 
+                                            onClick={handleLogout}
+                                            className="w-full text-left px-4 py-2 text-xs font-bold text-red-500 hover:bg-red-50 transition-colors flex items-center gap-2"
+                                        >
+                                            <XCircle className="w-3 h-3" /> Logout
+                                        </button>
                                     </div>
                                 )}
                             </div>
-                            <button onClick={handleLogout} className="p-2 hover:bg-red-50 text-red-400 hover:text-red-600 rounded-lg transition-colors">
-                                <XCircle className="w-5 h-5" />
-                            </button>
                         </div>
                     </div>
                 </header>
@@ -370,9 +545,12 @@ export default function CitizenDashboard() {
                                 </div>
                             </div>
                         </div>
-                        <button className="px-6 py-3 bg-gov-blue text-white text-xs font-black uppercase tracking-widest rounded-xl hover:bg-gov-blue shadow-lg shadow-gov-blue/20 transition-all active:scale-95">
+                        <a 
+                            href="tel:01122591171"
+                            className="px-6 py-3 bg-gov-blue text-white text-xs font-black uppercase tracking-widest rounded-xl hover:bg-gov-blue shadow-lg shadow-gov-blue/20 transition-all active:scale-95 no-underline flex items-center justify-center"
+                        >
                             Contact Support
-                        </button>
+                        </a>
                     </div>
 
                     {/* Live Feed Table Section */}
@@ -380,9 +558,12 @@ export default function CitizenDashboard() {
                         <div className="flex justify-between items-center mb-8">
                             <h2 className="text-xl font-black text-slate-800">My Grievance History</h2>
                             <div className="flex gap-3">
-                                <button className="px-4 py-2 border border-slate-100 rounded-xl text-xs font-bold text-slate-500 flex items-center gap-2 hover:bg-slate-50 transition-colors">
-                                    <LayoutGrid className="w-4 h-4" /> Filter
-                                </button>
+                                <Link href="/map" className="w-full">
+                                    <button className="w-full py-2.5 bg-slate-50 text-gov-blue rounded-xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-slate-100 transition-colors">
+                                        <MapPin className="w-4 h-4" />
+                                        LOCAL MAP
+                                    </button>
+                                </Link>
                                 <button 
                                     onClick={refreshFeed}
                                     className="px-4 py-2 bg-slate-50 text-gov-blue rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-gov-blue/5 transition-colors"
@@ -410,9 +591,12 @@ export default function CitizenDashboard() {
                                             <td className="px-4 py-6 text-sm font-bold text-slate-500">#{item.id}</td>
                                             <td className="px-4 py-6">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-500">
+                                                    <button 
+                                                        onClick={() => handleGrievanceVoice(item)}
+                                                        className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-500 hover:bg-blue-100 transition-colors"
+                                                    >
                                                         <Volume2 className="w-4 h-4" />
-                                                    </div>
+                                                    </button>
                                                     <span className="text-sm font-bold text-slate-800">{item.category}</span>
                                                 </div>
                                             </td>
@@ -460,6 +644,119 @@ export default function CitizenDashboard() {
                     </div>
                 </div>
             </main>
+
+            {/* My Profile Modal */}
+            {showMyProfileModal && (
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
+                    <div className="bg-white rounded-[32px] w-full max-w-md shadow-2xl border border-white overflow-hidden animate-in zoom-in-95 duration-300">
+                        <div className="p-8">
+                            <div className="flex justify-between items-start mb-8">
+                                <div className="w-16 h-16 bg-gov-blue/10 rounded-2xl flex items-center justify-center text-gov-blue">
+                                    <User className="w-8 h-8" />
+                                </div>
+                                <button 
+                                    onClick={() => setShowMyProfileModal(false)}
+                                    className="p-2 hover:bg-slate-50 rounded-xl text-slate-400 transition-colors"
+                                >
+                                    <XCircle className="w-6 h-6" />
+                                </button>
+                            </div>
+                            
+                            <h2 className="text-2xl font-black text-slate-800 mb-2">My Profile</h2>
+                            <p className="text-sm font-medium text-slate-500 mb-8">Your registered citizen details</p>
+                            
+                            <div className="space-y-6">
+                                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Full Name</p>
+                                    <p className="text-sm font-bold text-slate-800">{userProfile?.name}</p>
+                                </div>
+                                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Identification</p>
+                                    <p className="text-sm font-bold text-slate-800">{userProfile?.govIdType} - {userProfile?.govIdNumber}</p>
+                                </div>
+                                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Email Address</p>
+                                    <p className="text-sm font-bold text-slate-800">{userProfile?.email || "Not Provided"}</p>
+                                </div>
+                                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Residential Address</p>
+                                    <p className="text-sm font-bold text-slate-800">{userProfile?.address || "Not Provided"}</p>
+                                </div>
+                            </div>
+
+                            <button 
+                                onClick={() => {
+                                    setShowMyProfileModal(false);
+                                    setProfileFormData({
+                                        email: userProfile?.email || "",
+                                        address: userProfile?.address || ""
+                                    });
+                                    setShowUpdateProfileModal(true);
+                                }}
+                                className="w-full mt-8 py-4 bg-gov-blue text-white text-sm font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-gov-blue/20 hover:scale-[1.02] active:scale-95 transition-all"
+                            >
+                                Edit Optional Details
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Update Profile Modal */}
+            {showUpdateProfileModal && (
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
+                    <div className="bg-white rounded-[32px] w-full max-w-md shadow-2xl border border-white overflow-hidden animate-in zoom-in-95 duration-300">
+                        <form onSubmit={handleUpdateProfile} className="p-8">
+                            <div className="flex justify-between items-start mb-8">
+                                <div className="w-16 h-16 bg-gov-blue/10 rounded-2xl flex items-center justify-center text-gov-blue">
+                                    <Settings className="w-8 h-8" />
+                                </div>
+                                <button 
+                                    type="button"
+                                    onClick={() => setShowUpdateProfileModal(false)}
+                                    className="p-2 hover:bg-slate-50 rounded-xl text-slate-400 transition-colors"
+                                >
+                                    <XCircle className="w-6 h-6" />
+                                </button>
+                            </div>
+                            
+                            <h2 className="text-2xl font-black text-slate-800 mb-2">Update Profile</h2>
+                            <p className="text-sm font-medium text-slate-500 mb-8">Complete your profile for better updates</p>
+                            
+                            <div className="space-y-6">
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-2 block">Email Address</label>
+                                    <input 
+                                        type="email" 
+                                        placeholder="yourname@gmail.com"
+                                        className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-gov-blue/20 transition-all shadow-inner"
+                                        value={profileFormData.email}
+                                        onChange={(e) => setProfileFormData({...profileFormData, email: e.target.value})}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 mb-2 block">Residential Address</label>
+                                    <textarea 
+                                        placeholder="Full address here..."
+                                        rows={3}
+                                        className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl text-sm font-bold text-slate-800 outline-none focus:ring-2 focus:ring-gov-blue/20 transition-all shadow-inner resize-none"
+                                        value={profileFormData.address}
+                                        onChange={(e) => setProfileFormData({...profileFormData, address: e.target.value})}
+                                    />
+                                </div>
+                            </div>
+
+                            <button 
+                                type="submit"
+                                disabled={isUpdatingProfile}
+                                className="w-full mt-8 py-4 bg-gov-blue text-white text-sm font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-gov-blue/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 disabled:scale-100"
+                            >
+                                {isUpdatingProfile ? "Saving Changes..." : "Save Profile"}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -483,9 +780,9 @@ function Loader2(props: any) {
     )
 }
 
-function SidebarLink({ icon, label, active = false }: { icon: any, label: string, active?: boolean }) {
+function SidebarLink({ icon, label, href, active = false }: { icon: any, label: string, href: string, active?: boolean }) {
     return (
-        <Link href="#" className={`flex items-center gap-4 px-4 py-3 rounded-2xl text-sm font-bold transition-all ${active ? 'bg-gov-blue/5 text-gov-blue shadow-inner' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'}`}>
+        <Link href={href} className={`flex items-center gap-4 px-4 py-3 rounded-2xl text-sm font-bold transition-all ${active ? 'bg-gov-blue/5 text-gov-blue shadow-inner' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'}`}>
             <span className={`${active ? 'text-gov-blue' : 'text-slate-400'}`}>
                 {icon}
             </span>

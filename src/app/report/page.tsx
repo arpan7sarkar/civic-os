@@ -13,10 +13,14 @@ import {
     ArrowRight,
     AlertCircle,
     FileText,
-    ShieldCheck
+    ShieldCheck,
+    Mic,
+    Square
 } from "lucide-react";
 import Link from "next/link";
-import { analyzeIssueAction } from "@/app/actions/ai";
+import { analyzeIssueAction, transcribeAudioAction } from "@/app/actions/ai";
+import { reverseGeocodeAction } from "@/app/actions/geo";
+import { uploadGrievanceImageAction, createGrievanceAction } from "@/app/actions/grievance";
 import { saveComplaint, getComplaints } from "@/lib/store";
 import { getServerProfileAction } from "@/app/actions/profile";
 import { ComplaintCategory, Priority } from "@/lib/types";
@@ -36,9 +40,20 @@ export default function ReportPage() {
     } | null>(null);
 
     const [location, setLocation] = useState("");
+    const [coords, setCoords] = useState({ lat: 0, lng: 0 });
     const [isDetecting, setIsDetecting] = useState(false);
     const [ticketId, setTicketId] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Photo State
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [imagePreview, setImagePreview] = useState<string | null>(null);
+    const fileInputRef = useState<any>(null); // We'll use a hidden input
+
+    // Voice State
+    const [isRecording, setIsRecording] = useState(false);
+    const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+    const [isTranscribing, setIsTranscribing] = useState(false);
 
     useEffect(() => {
         getServerProfileAction().then(result => {
@@ -65,16 +80,73 @@ export default function ReportPage() {
         }
     };
 
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const recorder = new MediaRecorder(stream);
+            const chunks: BlobPart[] = [];
+
+            recorder.ondataavailable = (e) => chunks.push(e.data);
+            recorder.onstop = async () => {
+                const blob = new Blob(chunks, { type: 'audio/wav' });
+                const reader = new FileReader();
+                reader.readAsDataURL(blob);
+                reader.onloadend = async () => {
+                    const base64Audio = (reader.result as string).split(',')[1];
+                    setIsTranscribing(true);
+                    try {
+                        const response = await transcribeAudioAction(base64Audio);
+                        if (response && response.transcript) {
+                            setDescription(response.transcript);
+                            // Auto-analyze after transcription
+                            const analysis = await analyzeIssueAction(response.transcript);
+                            setAiResult(analysis);
+                            setStep(2);
+                        }
+                    } catch (err) {
+                        console.error("Transcription failed:", err);
+                    } finally {
+                        setIsTranscribing(false);
+                    }
+                };
+            };
+
+            recorder.start();
+            setMediaRecorder(recorder);
+            setIsRecording(true);
+        } catch (err) {
+            console.error("Microphone access denied:", err);
+        }
+    };
+
+    const stopRecording = () => {
+        if (mediaRecorder) {
+            mediaRecorder.stop();
+            mediaRecorder.stream.getTracks().forEach(track => track.stop());
+            setIsRecording(false);
+        }
+    };
+
     const detectLocation = () => {
         setIsDetecting(true);
         if ("geolocation" in navigator) {
             navigator.geolocation.getCurrentPosition(
                 async (position) => {
                     const { latitude, longitude } = position.coords;
-                    // In a real app, we'd reverse geocode here. 
-                    // For now, we'll show the coordinates and a placeholder or simplified address.
-                    setLocation(`Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)} (Auto-detected)`);
-                    setIsDetecting(false);
+                    setCoords({ lat: latitude, lng: longitude });
+                    
+                    try {
+                        const res = await reverseGeocodeAction(latitude, longitude);
+                        if (res.success && res.address) {
+                            setLocation(res.address);
+                        } else {
+                            setLocation(`Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)} (Coords only)`);
+                        }
+                    } catch (err) {
+                        setLocation(`Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`);
+                    } finally {
+                        setIsDetecting(false);
+                    }
                 },
                 (error) => {
                     console.error("GPS Error:", error);
@@ -89,27 +161,70 @@ export default function ReportPage() {
         }
     };
 
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setSelectedFile(file);
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setImagePreview(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
     const handleSubmit = async () => {
         if (!userId || !aiResult) return;
         setIsSubmitting(true);
         
+        let photoId = "";
+        
+        // 1. Upload Photo if selected
+        if (selectedFile) {
+            const formData = new FormData();
+            formData.append('image', selectedFile);
+            const uploadRes = await uploadGrievanceImageAction(formData);
+            if (uploadRes.success && uploadRes.fileId) {
+                photoId = uploadRes.fileId;
+            }
+        }
+
         const newTicketId = `CIV-${Math.floor(100000 + Math.random() * 900000)}`;
         
         try {
+            // 2. Save to Appwrite
+            const appwriteRes = await createGrievanceAction({
+                id: newTicketId,
+                description,
+                category: aiResult.category,
+                priority: aiResult.priority,
+                department: aiResult.department,
+                lat: coords.lat || 28.7041,
+                lng: coords.lng || 77.1025,
+                status: 'Pending',
+                assignedTo: 'Processing',
+                ward: location.split(',')[0] || 'Delhi Zone',
+                userId,
+                citizenPhoto: photoId
+            });
+
+            // 3. Fallback/Sync to local storage for existing dashboard components
             await saveComplaint({
                 id: newTicketId,
                 description,
                 category: aiResult.category,
                 priority: aiResult.priority,
                 department: aiResult.department,
-                lat: 28.7041, // Mock coords for demo
-                lng: 77.1025,
+                lat: coords.lat || 28.7041,
+                lng: coords.lng || 77.1025,
                 status: 'Pending',
                 assignedTo: 'Processing',
                 createdAt: new Date().toISOString(),
-                ward: 'Ward 88 (Rohini)',
-                userId
+                ward: location.split(',')[0] || 'Delhi Zone',
+                userId,
+                citizenPhoto: photoId
             });
+
             setTicketId(newTicketId);
             setStep(3);
         } catch (err) {
@@ -184,14 +299,30 @@ export default function ReportPage() {
                             </div>
                         </div>
 
-                        <button
-                            onClick={handleAIAnalyze}
-                            disabled={!description.trim() || isAnalyzing}
-                            className={`w-full py-4 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-lg ${description.trim() ? 'bg-gov-blue text-white shadow-gov-blue/20 hover:-translate-y-0.5 active:scale-95' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
-                        >
-                            {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin text-white" /> : <Sparkles className="w-4 h-4" />}
-                            {isAnalyzing ? "AI Routing..." : "Continue with AI Analysis"}
-                        </button>
+                        <div className="flex gap-4">
+                            <button
+                                onClick={handleAIAnalyze}
+                                disabled={!description.trim() || isAnalyzing || isTranscribing}
+                                className={`flex-1 py-4 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-lg ${description.trim() ? 'bg-gov-blue text-white shadow-gov-blue/20 hover:-translate-y-0.5 active:scale-95' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
+                            >
+                                {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin text-white" /> : <Sparkles className="w-4 h-4" />}
+                                {isAnalyzing ? "AI Routing..." : "Continue with AI Analysis"}
+                            </button>
+
+                            <button 
+                                onClick={isRecording ? stopRecording : startRecording}
+                                disabled={isAnalyzing || isTranscribing}
+                                className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-all ${isRecording ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                            >
+                                {isTranscribing ? (
+                                    <Loader2 className="w-6 h-6 animate-spin" />
+                                ) : isRecording ? (
+                                    <Square className="w-6 h-6 fill-current" />
+                                ) : (
+                                    <Mic className="w-6 h-6" />
+                                )}
+                            </button>
+                        </div>
                     </div>
                 )}
 
@@ -238,15 +369,36 @@ export default function ReportPage() {
 
                             <div>
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-3">Photo Evidence (Optional)</label>
-                                <div className="border-2 border-dashed border-slate-200 rounded-3xl p-10 flex flex-col items-center justify-center gap-4 bg-white/50 hover:bg-white hover:border-gov-blue/30 transition-all cursor-pointer">
-                                    <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 group-hover:text-gov-blue transition-colors">
-                                        <Camera className="w-6 h-6" />
-                                    </div>
-                                    <div className="text-center">
-                                        <p className="text-sm font-bold text-slate-600">Upload Photo of the Issue</p>
-                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">PNG, JPG up to 10MB</p>
-                                    </div>
-                                </div>
+                                <input 
+                                    type="file" 
+                                    accept="image/*" 
+                                    onChange={handleFileChange}
+                                    className="hidden" 
+                                    id="photo-upload"
+                                />
+                                <label 
+                                    htmlFor="photo-upload"
+                                    className="border-2 border-dashed border-slate-200 rounded-3xl p-10 flex flex-col items-center justify-center gap-4 bg-white/50 hover:bg-white hover:border-gov-blue/30 transition-all cursor-pointer overflow-hidden group"
+                                >
+                                    {imagePreview ? (
+                                        <div className="relative w-full aspect-video rounded-2xl overflow-hidden border border-slate-100">
+                                            <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-black uppercase tracking-widest">
+                                                Change Photo
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 group-hover:text-gov-blue transition-colors">
+                                                <Camera className="w-6 h-6" />
+                                            </div>
+                                            <div className="text-center">
+                                                <p className="text-sm font-bold text-slate-600">Upload Photo of the Issue</p>
+                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">PNG, JPG up to 10MB</p>
+                                            </div>
+                                        </>
+                                    )}
+                                </label>
                             </div>
                         </div>
 

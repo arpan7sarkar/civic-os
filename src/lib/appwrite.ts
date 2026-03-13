@@ -45,6 +45,8 @@ export const createAppwriteClient = (session?: string) => {
 
 export const DATABASE_ID = process.env.APPWRITE_DATABASE_ID || 'user_profiles';
 export const PROFILES_COLLECTION_ID = process.env.APPWRITE_PROFILES_COLLECTION_ID || 'user_profiles'; 
+export const GRIEVANCES_COLLECTION_ID = process.env.APPWRITE_GRIEVANCES_COLLECTION_ID || 'grievances';
 export const PROFILE_IMAGES_BUCKET_ID = process.env.APPWRITE_PROFILE_IMAGES_BUCKET_ID || '';
+export const GRIEVANCE_IMAGES_BUCKET_ID = process.env.APPWRITE_GRIEVANCE_IMAGES_BUCKET_ID || '';
 
 export { ID };

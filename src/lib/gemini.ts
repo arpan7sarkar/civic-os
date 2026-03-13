@@ -32,8 +32,10 @@ export async function analyzeIssue(description: string) {
         console.log(`[GEMINI] Attempting analysis with ${modelName}`);
         const model = genAI.getGenerativeModel({ model: modelName });
         const prompt = `
-        Analyze the following civic issue reported by a citizen in Delhi:
-        "${description}"
+        Analyze the following civic issue reported by a citizen in Delhi. 
+        Note: The report may be in Hindi or other native languages; please translate/analyze accordingly but provide the JSON fields in English.
+        
+        Issue: "${description}"
         
         Provide a JSON response with:
         - category: string (one of: Water Leakage, Garbage Collection, Street Light, Road Repair, Drainage, Other)

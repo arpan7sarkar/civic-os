@@ -31,7 +31,7 @@ export async function transcribeAudio(base64Audio: string) {
 /**
  * Integrated Sarvam AI client function for text-to-speech
  */
-export async function textToSpeech(text: string, speaker: string = "shubh") {
+export async function textToSpeech(text: string, speaker: string = "shubh", languageCode: string = "hi-IN") {
     if (!sarvamClient) {
         throw new Error("SARVAM_API_KEY is not configured");
     }
@@ -41,7 +41,7 @@ export async function textToSpeech(text: string, speaker: string = "shubh") {
             text,
             model: "bulbul:v3",
             speaker: speaker as any,
-            target_language_code: "en-IN"
+            target_language_code: languageCode as any
         });
         return response.audios;
     } catch (error) {

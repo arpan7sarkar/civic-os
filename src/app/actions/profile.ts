@@ -10,6 +10,8 @@ export interface UserProfile {
     govIdType: string;
     govIdNumber: string;
     profileImageUrl?: string;
+    email?: string;
+    address?: string;
 }
 
 /**
@@ -83,6 +85,44 @@ export async function getServerProfileAction() {
         };
     } catch (error: any) {
         console.error("[PROFILE_SERVER_V5] Error:", error.message);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
+ * Update user profile
+ */
+export async function updateUserProfileAction(data: Partial<UserProfile>) {
+    try {
+        const cookieStore = await cookies();
+        const sessionSecret = cookieStore.getAll().find(c => c.name.startsWith('a_session_'))?.value;
+
+        if (!sessionSecret) return { success: false, error: 'NO_SESSION' };
+
+        const { databases } = createAppwriteClient(sessionSecret);
+        
+        if (!data.userId) return { success: false, error: 'USER_ID_REQUIRED' };
+
+        const response = await databases.listDocuments(
+            DATABASE_ID,
+            PROFILES_COLLECTION_ID,
+            [Query.equal('userId', data.userId as string)]
+        );
+
+        if (response.documents.length === 0) {
+            return { success: false, error: 'PROFILE_NOT_FOUND' };
+        }
+
+        const docId = response.documents[0].$id;
+        const result = await databases.updateDocument(
+            DATABASE_ID,
+            PROFILES_COLLECTION_ID,
+            docId,
+            data
+        );
+
+        return { success: true, profile: JSON.parse(JSON.stringify(result)) as UserProfile };
+    } catch (error: any) {
         return { success: false, error: error.message };
     }
 }

@@ -20,6 +20,6 @@ export async function transcribeAudioAction(base64Audio: string) {
 /**
  * Server Action for Sarvam TTS using library
  */
-export async function textToSpeechAction(text: string, speaker: string = "shubh") {
-    return await textToSpeech(text, speaker);
+export async function textToSpeechAction(text: string, speaker: string = "shubh", languageCode: string = "hi-IN") {
+    return await textToSpeech(text, speaker, languageCode);
 }
