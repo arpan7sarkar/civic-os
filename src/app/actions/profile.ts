@@ -1,7 +1,8 @@
 'use server';
 
-import { account, databases, storage, DATABASE_ID, PROFILES_COLLECTION_ID, PROFILE_IMAGES_BUCKET_ID } from '@/lib/appwrite';
+import { account, databases, storage, DATABASE_ID, PROFILES_COLLECTION_ID, PROFILE_IMAGES_BUCKET_ID, client } from '@/lib/appwrite';
 import { Query, ID } from 'appwrite';
+import { cookies } from 'next/headers';
 
 export interface UserProfile {
     userId: string;
@@ -16,15 +17,24 @@ export interface UserProfile {
  */
 export async function getServerProfileAction() {
     try {
+        const projectId = process.env.APPWRITE_PROJECT_ID;
+        const cookieStore = await cookies();
+        const sessionSecret = cookieStore.get(`a_session_${projectId}`)?.value;
+
+        if (sessionSecret) {
+            client.setSession(sessionSecret);
+        }
+
         const user = await account.get();
-        const response = await databases.listDocuments(
-            DATABASE_ID,
-            PROFILES_COLLECTION_ID,
-            [Query.equal('userId', user.$id)]
-        );
+        const response = await databases.listDocuments({
+            databaseId: DATABASE_ID,
+            collectionId: PROFILES_COLLECTION_ID,
+            queries: [Query.equal('userId', user.$id)]
+        });
 
         if (response.documents.length > 0) {
-            return { success: true, profile: response.documents[0] as unknown as UserProfile };
+            const profile = JSON.parse(JSON.stringify(response.documents[0]));
+            return { success: true, profile: profile as unknown as UserProfile };
         }
         return { success: true, profile: null };
     } catch (error: any) {
@@ -41,6 +51,14 @@ export async function getServerProfileAction() {
  */
 export async function createProfileWithImageAction(formData: FormData) {
     try {
+        const projectId = process.env.APPWRITE_PROJECT_ID;
+        const cookieStore = await cookies();
+        const sessionSecret = cookieStore.get(`a_session_${projectId}`)?.value;
+
+        if (sessionSecret) {
+            client.setSession(sessionSecret);
+        }
+
         const userId = formData.get('userId') as string;
         const name = formData.get('name') as string;
         const govIdType = formData.get('govIdType') as string;
@@ -51,12 +69,15 @@ export async function createProfileWithImageAction(formData: FormData) {
 
         // 1. Upload Image if exists
         if (imageFile && imageFile.size > 0) {
-            const upload = await storage.createFile(
-                PROFILE_IMAGES_BUCKET_ID,
-                ID.unique(),
-                imageFile
-            );
-            profileImageUrl = storage.getFileView(PROFILE_IMAGES_BUCKET_ID, upload.$id).toString();
+            const upload = await storage.createFile({
+                bucketId: PROFILE_IMAGES_BUCKET_ID,
+                fileId: ID.unique(),
+                file: imageFile
+            });
+            profileImageUrl = storage.getFileView({
+                bucketId: PROFILE_IMAGES_BUCKET_ID,
+                fileId: upload.$id
+            });
         }
 
         // 2. Create Profile document
@@ -68,12 +89,12 @@ export async function createProfileWithImageAction(formData: FormData) {
             profileImageUrl
         };
 
-        const result = await databases.createDocument(
-            DATABASE_ID,
-            PROFILES_COLLECTION_ID,
-            ID.unique(),
-            profile
-        );
+        const result = await databases.createDocument({
+            databaseId: DATABASE_ID,
+            collectionId: PROFILES_COLLECTION_ID,
+            documentId: ID.unique(),
+            data: profile
+        });
 
         return { success: true, data: result };
     } catch (error: any) {

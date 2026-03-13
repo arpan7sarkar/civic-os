@@ -15,12 +15,14 @@ export default function AuthPage() {
     const [mobile, setMobile] = useState('');
     const [captchaInput, setCaptchaInput] = useState('');
     const [captchaText, setCaptchaText] = useState('');
-    const [otp, setOtp] = useState('');
+    const [otpArray, setOtpArray] = useState(['', '', '', '', '', '']);
+    const [peekIndex, setPeekIndex] = useState<number | null>(null);
     const [step, setStep] = useState<'input' | 'otp'>('input');
     const [userId, setUserId] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [timer, setTimer] = useState<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         setCaptchaText(generateCaptcha(6));
@@ -67,7 +69,8 @@ export default function AuthPage() {
 
     const handleVerifyOTP = async () => {
         setError('');
-        if (!otp || otp.length < 6) {
+        const otpValue = otpArray.join('');
+        if (otpValue.length < 6) {
             setError('Please enter the 6-digit OTP');
             return;
         }
@@ -75,7 +78,7 @@ export default function AuthPage() {
         setIsLoading(true);
         try {
             // 1. Verify OTP securely
-            const result = await verifyOTPAction(userId, otp);
+            const result = await verifyOTPAction(userId, otpValue);
             
             if (result.success) {
                 setSuccess('Authenticated successfully! Redirecting...');
@@ -218,15 +221,60 @@ export default function AuthPage() {
                                     </div>
 
                                     <div>
-                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">Enter Verification Code</label>
-                                        <input 
-                                            type="text"
-                                            maxLength={6}
-                                            value={otp}
-                                            onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                                            className="w-full px-4 py-6 bg-slate-50 border border-slate-100 rounded-xl text-4xl font-black text-center tracking-[0.5em] text-gov-blue placeholder:text-slate-200 focus:bg-white focus:border-gov-blue focus:ring-4 focus:ring-gov-blue/5 transition-all outline-none"
-                                            placeholder="000000"
-                                        />
+                                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 px-1 text-center">Enter Verification Code</label>
+                                        <div className="flex justify-between gap-2 md:gap-3">
+                                            {otpArray.map((digit, index) => (
+                                                <div key={index} className="relative flex-1">
+                                                    <input 
+                                                        id={`otp-${index}`}
+                                                        type="text"
+                                                        inputMode="numeric"
+                                                        autoComplete="one-time-code"
+                                                        maxLength={1}
+                                                        value={digit}
+                                                        onChange={(e) => {
+                                                            const val = e.target.value.replace(/\D/g, '');
+                                                            if (!val && digit === '') return;
+                                                            
+                                                            const newOtp = [...otpArray];
+                                                            newOtp[index] = val.slice(-1);
+                                                            setOtpArray(newOtp);
+
+                                                            // Peek-a-boo logic
+                                                            if (val) {
+                                                                setPeekIndex(index);
+                                                                if (timer) clearTimeout(timer);
+                                                                const newTimer = setTimeout(() => setPeekIndex(null), 1000);
+                                                                setTimer(newTimer);
+                                                                
+                                                                // Focus next box
+                                                                if (index < 5) {
+                                                                    const nextInput = document.getElementById(`otp-${index + 1}`);
+                                                                    nextInput?.focus();
+                                                                }
+                                                            }
+                                                        }}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Backspace' && !otpArray[index] && index > 0) {
+                                                                const prevInput = document.getElementById(`otp-${index - 1}`);
+                                                                prevInput?.focus();
+                                                            }
+                                                        }}
+                                                        className={`w-full aspect-square md:h-16 bg-slate-50 border-2 rounded-xl text-2xl font-black text-center transition-all outline-none flex items-center justify-center
+                                                            ${peekIndex === index || !digit ? 'text-gov-blue' : 'text-transparent'}
+                                                            ${digit ? 'border-gov-blue/20 bg-white' : 'border-slate-100'}
+                                                            focus:border-gov-blue focus:ring-4 focus:ring-gov-blue/5`}
+                                                        placeholder="•"
+                                                    />
+                                                    {/* Mask overlay for secret effect */}
+                                                    {digit && peekIndex !== index && (
+                                                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                                            <div className="w-2.5 h-2.5 bg-gov-blue rounded-full" />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
 
                                     <button 

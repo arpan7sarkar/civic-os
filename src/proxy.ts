@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-export function middleware(request: NextRequest) {
+export default function proxy(request: NextRequest) {
     const allCookies = request.cookies.getAll();
     const sessionCookie = allCookies.find(c => c.name.startsWith('a_session_'));
     const hasSession = !!sessionCookie?.value;
