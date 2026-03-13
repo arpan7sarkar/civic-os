@@ -14,8 +14,15 @@ export default function Header() {
 
     useEffect(() => {
         const checkSession = async () => {
+            // Priority 1: Check server action (most reliable)
             const { success } = await getCurrentUserAction();
-            setIsLoggedIn(success);
+            if (success) {
+                setIsLoggedIn(true);
+            } else {
+                // Priority 2: client-side cookie fallback (faster for hydration)
+                const hasCookie = document.cookie.split(';').some(c => c.trim().startsWith('a_session_'));
+                setIsLoggedIn(hasCookie);
+            }
             setIsLoading(false);
         };
         checkSession();

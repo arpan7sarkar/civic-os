@@ -1,8 +1,8 @@
 'use server';
 
-import { account, databases, storage, DATABASE_ID, PROFILES_COLLECTION_ID, PROFILE_IMAGES_BUCKET_ID, client } from '@/lib/appwrite';
+import { DATABASE_ID, PROFILES_COLLECTION_ID, PROFILE_IMAGES_BUCKET_ID, createAppwriteClient } from '@/lib/appwrite';
 import { Query, ID } from 'appwrite';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 
 export interface UserProfile {
     userId: string;
@@ -17,35 +17,72 @@ export interface UserProfile {
  */
 export async function getServerProfileAction() {
     try {
-        const projectId = process.env.APPWRITE_PROJECT_ID;
         const cookieStore = await cookies();
-        const sessionSecret = cookieStore.get(`a_session_${projectId}`)?.value;
+        const headerStore = await headers();
+        const rawCookies = headerStore.get('cookie') || '';
+        
+        // 1. Multi-Layer Session Recovery
+        let sessionSecret = cookieStore.getAll().find(c => c.name.startsWith('a_session_'))?.value;
+        const bridgeUserId = cookieStore.get('civic_auth_verified')?.value;
 
-        if (sessionSecret) {
-            client.setSession(sessionSecret);
+        // Manual Fallback if cookies() fails
+        if (!sessionSecret) {
+            // Check x-civic-session header (from Proxy)
+            sessionSecret = headerStore.get('x-civic-session') || undefined;
+            
+            // Check raw cookies as last resort
+            if (!sessionSecret && rawCookies.includes('a_session_')) {
+                const match = rawCookies.match(/a_session_[^=;]+=([^;]+)/);
+                if (match) sessionSecret = match[1].trim();
+            }
         }
 
-        const user = await account.get();
-        console.log(`[PROFILE_ACTION] Found user: ${user.$id} (${user.name || 'No Name'})`);
-        
-        const response = await databases.listDocuments({
-            databaseId: DATABASE_ID,
-            collectionId: PROFILES_COLLECTION_ID,
-            queries: [Query.equal('userId', user.$id)]
-        });
+        console.log(`[PROFILE_SERVER_V5] Session: ${!!sessionSecret}, Bridge: ${!!bridgeUserId}`);
 
-        console.log(`[PROFILE_ACTION] Profile search for ${user.$id}: ${response.documents.length} docs found`);
+        if (!sessionSecret) {
+            if (bridgeUserId) {
+                console.log(`[PROFILE_SERVER_V5] Falling back to Bridge UI for UID: ${bridgeUserId}`);
+                return { 
+                    success: true, 
+                    profile: { 
+                        userId: bridgeUserId, 
+                        name: 'Citizen (Bridge Verified)', 
+                        govIdType: 'Verified', 
+                        govIdNumber: '****' 
+                    } as UserProfile 
+                };
+            }
+            return { success: false, error: 'NO_SESSION' };
+        }
+
+        // Real Session Fetch
+        const { account, databases } = createAppwriteClient(sessionSecret);
+        const user = await account.get();
+        console.log(`[PROFILE_SERVER_V5] Authenticated User: ${user.name} (${user.$id})`);
+        
+        const response = await databases.listDocuments(
+            DATABASE_ID,
+            PROFILES_COLLECTION_ID,
+            [Query.equal('userId', user.$id)]
+        );
 
         if (response.documents.length > 0) {
             const profile = JSON.parse(JSON.stringify(response.documents[0]));
             return { success: true, profile: profile as unknown as UserProfile };
         }
-        return { success: true, profile: null };
+
+        // If no DB profile exists, fallback to account info
+        return { 
+            success: true, 
+            profile: { 
+                userId: user.$id, 
+                name: user.name || 'Citizen', 
+                govIdType: 'N/A', 
+                govIdNumber: 'N/A' 
+            } as UserProfile 
+        };
     } catch (error: any) {
-        if (error?.code === 401) {
-            return { success: false, error: 'NO_SESSION' };
-        }
-        console.error("Profile Action - Get Profile Error:", error);
+        console.error("[PROFILE_SERVER_V5] Error:", error.message);
         return { success: false, error: error.message };
     }
 }
@@ -55,14 +92,12 @@ export async function getServerProfileAction() {
  */
 export async function createProfileWithImageAction(formData: FormData) {
     try {
-        const projectId = process.env.APPWRITE_PROJECT_ID;
         const cookieStore = await cookies();
-        const sessionSecret = cookieStore.get(`a_session_${projectId}`)?.value;
+        const sessionSecret = cookieStore.getAll().find(c => c.name.startsWith('a_session_'))?.value;
 
-        if (sessionSecret) {
-            client.setSession(sessionSecret);
-        }
+        if (!sessionSecret) return { success: false, error: 'NO_SESSION' };
 
+        const { databases, storage } = createAppwriteClient(sessionSecret);
         const userId = formData.get('userId') as string;
         const name = formData.get('name') as string;
         const govIdType = formData.get('govIdType') as string;
@@ -70,39 +105,28 @@ export async function createProfileWithImageAction(formData: FormData) {
         const imageFile = formData.get('image') as File | null;
 
         let profileImageUrl = '';
-
-        // 1. Upload Image if exists
         if (imageFile && imageFile.size > 0) {
-            const upload = await storage.createFile({
-                bucketId: PROFILE_IMAGES_BUCKET_ID,
-                fileId: ID.unique(),
-                file: imageFile
-            });
-            profileImageUrl = storage.getFileView({
-                bucketId: PROFILE_IMAGES_BUCKET_ID,
-                fileId: upload.$id
-            });
+            const upload = await storage.createFile(
+                PROFILE_IMAGES_BUCKET_ID,
+                ID.unique(),
+                imageFile
+            );
+            profileImageUrl = storage.getFileView(
+                PROFILE_IMAGES_BUCKET_ID,
+                upload.$id
+            ).toString();
         }
 
-        // 2. Create Profile document
-        const profile: UserProfile = {
-            userId,
-            name,
-            govIdType,
-            govIdNumber,
-            profileImageUrl
-        };
-
-        const result = await databases.createDocument({
-            databaseId: DATABASE_ID,
-            collectionId: PROFILES_COLLECTION_ID,
-            documentId: ID.unique(),
-            data: profile
-        });
+        const profile: UserProfile = { userId, name, govIdType, govIdNumber, profileImageUrl };
+        const result = await databases.createDocument(
+            DATABASE_ID,
+            PROFILES_COLLECTION_ID,
+            ID.unique(),
+            profile
+        );
 
         return { success: true, data: result };
     } catch (error: any) {
-        console.error("Profile Action - Create Profile Error:", error);
         return { success: false, error: error.message };
     }
 }

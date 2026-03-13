@@ -28,8 +28,25 @@ interface InfrastructureAlert {
 export function getComplaints(userId?: string): Complaint[] {
     if (typeof window === 'undefined') return [];
     const stored = localStorage.getItem(STORAGE_KEY);
-    const complaints: Complaint[] = stored ? JSON.parse(stored) : [];
+    let complaints: Complaint[] = stored ? JSON.parse(stored) : [];
     
+    // Auto-Migrate tickets from the fallback Bridge Account to the REAL user account
+    if (userId && userId !== '69b3113c0002f41bb917' && userId !== 'demo-user') {
+        let needsMigration = false;
+        complaints = complaints.map(c => {
+            if (c.userId === '69b3113c0002f41bb917') {
+                needsMigration = true;
+                return { ...c, userId: userId };
+            }
+            return c;
+        });
+        
+        if (needsMigration) {
+            console.log(`[STORE] Auto-migrated Bridge tickets to real Appwrite UID: ${userId}`);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(complaints));
+        }
+    }
+
     if (userId) {
         return complaints.filter(c => c.userId === userId);
     }

@@ -1,9 +1,9 @@
 export default function StatsRibbon() {
     const stats = [
-        { label: "Complaints Received", value: "24,852", active: false },
-        { label: "Resolved in 24h", value: "1,284", active: true },
-        { label: "Active Wards", value: "250", active: false },
-        { label: "Satisfaction Rate", value: "92%", active: false },
+        { label: "Complaints Received", value: "24,852", active: false, color: 'primary' },
+        { label: "Resolved in 24h", value: "1,284", active: true, color: 'primary' },
+        { label: "Active Wards", value: "250", active: false, color: 'primary' },
+        { label: "Satisfaction Rate", value: "92%", active: false, color: 'primary' },
     ];
 
     return (
@@ -12,7 +12,7 @@ export default function StatsRibbon() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
                     {stats.map((stat, index) => (
                         <div key={index} className={`flex flex-col items-center text-center ${index !== 0 ? 'border-l border-slate-100' : ''}`}>
-                            <span className={`${stat.active ? 'text-primary' : 'text-gov-blue'} text-3xl font-black mb-1`}>
+                            <span className={`${stat.color === 'gov-blue' ? 'text-gov-blue' : 'text-primary'} text-3xl font-black mb-1`}>
                                 {stat.value}
                             </span>
                             <span className="text-slate-500 text-sm font-medium uppercase tracking-wider">

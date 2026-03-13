@@ -18,25 +18,23 @@ export default function RegisterProfilePage() {
     const [error, setError] = useState('');
 
     useEffect(() => {
+        let retries = 0;
+        const maxRetries = 3;
+
         const checkAuth = async () => {
             const { success, user } = await getCurrentUserAction();
             if (success && user) {
                 setUserId(user.$id);
+            } else if (retries < maxRetries) {
+                retries++;
+                console.log(`[REGISTER] Session not found, retry ${retries}/${maxRetries}...`);
+                setTimeout(checkAuth, 500); // Wait 500ms and try again
             } else {
-                // If we just redirected from Auth, maybe the cookie is still landing
-                console.log("[REGISTER] No session yet, retrying in 1s...");
-                setTimeout(async () => {
-                    const retry = await getCurrentUserAction();
-                    if (retry.success && retry.user) {
-                        setUserId(retry.user.$id);
-                    } else {
-                        router.replace('/auth');
-                    }
-                }, 1000);
+                console.log("[REGISTER] Max retries reached, redirecting to /auth");
+                router.replace('/auth');
             }
         };
         checkAuth();
-        router.refresh();
     }, [router]);
 
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {

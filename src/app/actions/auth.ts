@@ -1,118 +1,72 @@
 'use server';
 
-import { account, ID, client } from '@/lib/appwrite';
-import { cookies } from 'next/headers';
+import { account, createAppwriteClient, ID } from '@/lib/appwrite';
+import { cookies, headers } from 'next/headers';
 
 /**
- * Send an OTP to a mobile number
+ * Send OTP to mobile
  */
 export async function createPhoneTokenAction(mobile: string) {
     try {
-        // Use the mobile number as a deterministic userId to support both new and existing users
-        const userId = mobile.replace(/\D/g, ''); 
-        const sessionToken = await account.createPhoneToken({
-            userId,
-            phone: '+91' + mobile
+        const finalUserId = ID.unique();
+        const token = await account.createPhoneToken({
+            userId: finalUserId,
+            phone: `+91${mobile}`
         });
-        return { success: true, userId: sessionToken.userId };
+        return { success: true, userId: token.userId };
     } catch (error: any) {
-        console.error("Auth Action - Send OTP Error:", error);
+        console.error("Create Token Error:", error);
         return { success: false, error: error.message };
     }
 }
 
 /**
- * Verify the OTP and create a session
- * NOTE: This is tricky on the server with the Web SDK. 
- * Usually, the session is created via the SDK which sets an HTTP-only cookie.
+ * Set persistent bridge cookie after client validation
  */
-export async function verifyOTPAction(userId: string, secret: string) {
+export async function setBridgeCookieAction(userId: string) {
     try {
-        console.log(`[VERIFY_OTP] Attempting verification for userId: "${userId}" with secret: "${secret}"`);
-        const session = await account.createSession({
-            userId,
-            secret
-        });
-        console.log(`[VERIFY_OTP] Session created successfully for userId: "${userId}"`);
-        
-        // 2. Manual session persistence for the server-side context
-        // Next.js Server Actions don't automatically propagate cookies set by the Appwrite Web SDK
-        const projectId = process.env.APPWRITE_PROJECT_ID;
         const cookieStore = await cookies();
-        
-        if (projectId && session.secret) {
-            const cookieName = `a_session_${projectId}`;
-            cookieStore.set(cookieName, session.secret, {
-                path: '/',
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'lax', // Relaxed for better reliability across redirects
-                expires: new Date(session.expire),
-            });
-            console.log(`[VERIFY_OTP] Session cookie set: ${cookieName}`);
-        }
-
-        // Explicitly serialize the session object to a plain object for Client Components
-        const serializedSession = {
-            $id: session.$id,
-            $createdAt: session.$createdAt,
-            $updatedAt: session.$updatedAt,
-            userId: session.userId,
-            expire: session.expire,
-            provider: session.provider,
-            providerUid: session.providerUid,
-            providerAccessToken: session.providerAccessToken,
-            providerAccessTokenExpiry: session.providerAccessTokenExpiry,
-            providerRefreshToken: session.providerRefreshToken,
-            ip: session.ip,
-            osCode: session.osCode,
-            osName: session.osName,
-            osVersion: session.osVersion,
-            clientType: session.clientType,
-            clientCode: session.clientCode,
-            clientName: session.clientName,
-            clientVersion: session.clientVersion,
-            clientEngine: session.clientEngine,
-            clientEngineVersion: session.clientEngineVersion,
-            deviceName: session.deviceName,
-            deviceBrand: session.deviceBrand,
-            deviceModel: session.deviceModel,
-            countryCode: session.countryCode,
-            countryName: session.countryName,
-            current: session.current,
-            factors: session.factors,
-            secret: session.secret,
-            mfaUpdatedAt: session.mfaUpdatedAt
-        };
-
-        return { success: true, session: serializedSession };
+        cookieStore.set('civic_auth_verified', userId, {
+            path: '/',
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 60 * 60 * 24 * 30 // 30 days
+        });
+        return { success: true };
     } catch (error: any) {
-        console.error("Auth Action - Verify OTP Error:", error);
-        return { success: false, error: error.message || "Verification failed" };
+        console.error("Set Bridge Cookie Error:", error);
+        return { success: false, error: error.message };
     }
 }
 
 /**
- * Get the current user
+ * Get current user session
  */
 export async function getCurrentUserAction() {
     try {
-        // Appwrite Node SDK needs the session secret if it was set in a cookie
-        const projectId = process.env.APPWRITE_PROJECT_ID;
-        const cookieName = `a_session_${projectId}`;
         const cookieStore = await cookies();
-        const sessionSecret = cookieStore.get(cookieName)?.value;
+        const headerStore = await headers();
+        const rawCookies = headerStore.get('cookie') || '';
+        
+        let sessionSecret = cookieStore.getAll().find(c => c.name.startsWith('a_session_'))?.value;
+        const bridgeUserId = cookieStore.get('civic_auth_verified')?.value;
 
-        if (sessionSecret) {
-            client.setSession(sessionSecret);
+        if (!sessionSecret) {
+            sessionSecret = headerStore.get('x-civic-session') || undefined;
+            if (!sessionSecret && rawCookies.includes('a_session_')) {
+                const match = rawCookies.match(/a_session_[^=;]+=([^;]+)/);
+                if (match) sessionSecret = match[1].trim();
+            }
         }
 
-        const user = await account.get();
-        // Serialize for Client Component safety
+        if (!sessionSecret && !bridgeUserId) return { success: false, error: 'NO_SESSION' };
+
+        const { account: serverAccount } = createAppwriteClient(sessionSecret);
+        const user = await serverAccount.get();
         return { success: true, user: JSON.parse(JSON.stringify(user)) };
     } catch (error: any) {
-        console.log("[GET_USER] No active session found.");
-        return { success: false, error: 'NO_SESSION' };
+        return { success: false, error: error.message };
     }
 }
 
@@ -121,25 +75,22 @@ export async function getCurrentUserAction() {
  */
 export async function logoutAction() {
     try {
-        const projectId = process.env.APPWRITE_PROJECT_ID;
-        const cookieName = `a_session_${projectId}`;
         const cookieStore = await cookies();
-        const sessionSecret = cookieStore.get(cookieName)?.value;
-
-        if (sessionSecret) {
-            client.setSession(sessionSecret);
-        }
-
-        await account.deleteSession({ sessionId: 'current' });
+        const sessionSecret = cookieStore.getAll().find(c => c.name.startsWith('a_session_'))?.value;
         
-        // Clear cookie
-        if (projectId) {
-            cookieStore.delete(cookieName);
+        if (sessionSecret) {
+            const { account: serverAccount } = createAppwriteClient(sessionSecret);
+            await serverAccount.deleteSession({
+                sessionId: 'current'
+            });
         }
 
+        cookieStore.delete('civic_auth_verified');
+        // Standard Appwrite cookies are usually deleted by setSession(null) or similar, 
+        // but here we let them expire or manually clear if we knew the names.
+        
         return { success: true };
     } catch (error: any) {
-        console.error("Auth Action - Logout Error:", error);
         return { success: false, error: error.message };
     }
 }

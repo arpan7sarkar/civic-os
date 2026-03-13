@@ -92,32 +92,98 @@ export default function CitizenDashboard() {
     };
 
     useEffect(() => {
+        let retries = 0;
+        const maxRetries = 3;
+
         const initDashboard = async () => {
+            console.log(`[DASHBOARD_CLIENT] Starting Init (Retry: ${retries})`);
+            
+            // Safety: Force stop loading after 10s
+            const safetyTimeout = setTimeout(() => {
+                if (isLoading) {
+                    console.warn("[DASHBOARD_CLIENT] Safety Timeout reached. Forcing load.");
+                    setIsLoading(false);
+                }
+            }, 10000);
+
             try {
                 setIsLoading(true);
+                console.log(`[DASHBOARD_CLIENT] Calling getServerProfileAction...`);
                 const result = await getServerProfileAction();
-                if (!result.success || !result.profile) {
-                    router.replace('/auth/register');
-                    return;
-                }
-                const profile = result.profile;
-                setUserProfile(profile);
+                console.log(`[DASHBOARD_CLIENT] Result:`, result);
                 
-                // Perform initial load
-                const currentComplaints = getComplaints(profile.userId);
-                if (currentComplaints.length > 0) {
-                    const insight = await analyzeIssueAction(currentComplaints[0].description);
-                    setAiInsight(insight);
+                let finalProfile = result.profile;
+
+                // NEW: Client-Side Recovery Fallback (Perfect for Localhost)
+                if (result.success && (!finalProfile || finalProfile.name.includes('Bridge'))) {
+                    console.log("[DASHBOARD_CLIENT] Server missing deep session. Attempting Client-Side Recovery...");
+                    try {
+                        const { account: browserAccount, databases: browserDatabases, DATABASE_ID, PROFILES_COLLECTION_ID } = await import('@/lib/appwrite');
+                        const { Query } = await import('appwrite');
+                        
+                        const browserUser = await browserAccount.get();
+                        console.log("[DASHBOARD_CLIENT] Client-Side Account Found:", browserUser.name);
+                        
+                        // Try to get real profile doc from DB via client-side
+                        const dbResult = await browserDatabases.listDocuments(
+                            DATABASE_ID,
+                            PROFILES_COLLECTION_ID,
+                            [Query.equal('userId', browserUser.$id)]
+                        );
+
+                        if (dbResult.documents.length > 0) {
+                            finalProfile = JSON.parse(JSON.stringify(dbResult.documents[0])) as UserProfile;
+                        } else {
+                            finalProfile = {
+                                userId: browserUser.$id,
+                                name: browserUser.name || 'Citizen',
+                                govIdType: 'N/A',
+                                govIdNumber: 'N/A'
+                            };
+                        }
+                    } catch (e: any) {
+                        console.warn("[DASHBOARD_CLIENT] Client-Side Recovery failed:", e.message);
+                    }
                 }
-                await loadData(profile.userId);
-            } catch (error: any) {
-                if (error.message === 'NO_SESSION' || (error && typeof error === 'object' && error.error === 'NO_SESSION')) {
-                    router.replace('/auth');
+
+                if (finalProfile) {
+                    console.log(`[DASHBOARD_CLIENT] Final Profile Resolved:`, finalProfile.userId);
+                    setUserProfile(finalProfile);
+                    
+                    await loadData(finalProfile.userId);
+                    setIsLoading(false);
+                    clearTimeout(safetyTimeout);
+
+                    // Background enrichment
+                    const currentComplaints = getComplaints(finalProfile.userId);
+                    if (currentComplaints.length > 0) {
+                        analyzeIssueAction(currentComplaints[0].description)
+                            .then(insight => setAiInsight(insight))
+                            .catch(aiErr => console.warn("AI Insight Background Error:", aiErr));
+                    }
+                } else if (!result.success && (result.error === 'NO_SESSION' || result.error?.includes('401'))) {
+                    clearTimeout(safetyTimeout);
+                    if (retries < maxRetries) {
+                        retries++;
+                        console.log(`[DASHBOARD_CLIENT] Session missing/401, retrying ${retries}/${maxRetries}...`);
+                        setTimeout(initDashboard, 1000); // 1s wait between retries
+                    } else {
+                        console.log(`[DASHBOARD_CLIENT] Max retries reached. Redirecting to auth.`);
+                        router.replace('/auth');
+                    }
+                } else if (result.success && !result.profile) {
+                    console.log(`[DASHBOARD_CLIENT] No profile found. Redirecting to register.`);
+                    clearTimeout(safetyTimeout);
+                    router.replace('/auth/register');
                 } else {
-                    console.error("Dashboard Load Error:", error);
+                    console.error("[DASHBOARD_CLIENT] Unexpected State:", result);
+                    setIsLoading(false);
+                    clearTimeout(safetyTimeout);
                 }
-            } finally {
+            } catch (error: any) {
+                console.error("[DASHBOARD_CLIENT] Fatal Error during init:", error);
                 setIsLoading(false);
+                clearTimeout(safetyTimeout);
             }
         };
         initDashboard();
