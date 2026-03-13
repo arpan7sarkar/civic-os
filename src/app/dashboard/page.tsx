@@ -31,7 +31,9 @@ import {
     Mic,
     Volume2,
     User,
-    FileDown
+    FileDown,
+    Menu,
+    X
 } from "lucide-react";
 import { logoutAction } from "@/app/actions/auth";
 import { getServerProfileAction, UserProfile, updateUserProfileAction } from "@/app/actions/profile";
@@ -75,6 +77,7 @@ export default function CitizenDashboard() {
     // Voice Assist State
     const [isRecording, setIsRecording] = useState(false);
     const [isSpeaking, setIsSpeaking] = useState(false);
+    const [showMobileSidebar, setShowMobileSidebar] = useState(false);
 
     const playAudio = (base64: string) => {
         const audio = new Audio(`data:audio/wav;base64,${base64}`);
@@ -317,16 +320,32 @@ export default function CitizenDashboard() {
 
     return (
         <div className="flex min-h-screen bg-[#F8FAFC]">
+            {/* Mobile Sidebar Overlay */}
+            {showMobileSidebar && (
+                <div 
+                    className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 lg:hidden"
+                    onClick={() => setShowMobileSidebar(false)}
+                />
+            )}
+
             {/* Sidebar matches design */}
-            <aside className="w-64 bg-white border-r border-slate-100 flex flex-col fixed inset-y-0 z-20">
-                <div className="p-6 flex items-center gap-3 border-b border-slate-50">
-                    <div className="w-8 h-8 bg-gov-blue rounded-lg flex items-center justify-center shadow-lg shadow-gov-blue/20">
-                        <ShieldAlert className="w-5 h-5 text-white" />
+            <aside className={`w-64 bg-white border-r border-slate-100 flex flex-col fixed inset-y-0 z-50 transition-transform duration-300 lg:translate-x-0 ${showMobileSidebar ? 'translate-x-0' : '-translate-x-full'} lg:z-20`}>
+                <div className="p-6 flex items-center justify-between border-b border-slate-50">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-gov-blue rounded-lg flex items-center justify-center shadow-lg shadow-gov-blue/20">
+                            <ShieldAlert className="w-5 h-5 text-white" />
+                        </div>
+                        <div>
+                            <h1 className="text-sm font-black text-slate-800 leading-none">MCD CivicOS</h1>
+                            <p className="text-[10px] text-slate-400 font-bold mt-1">Govt. of NCT Delhi</p>
+                        </div>
                     </div>
-                    <div>
-                        <h1 className="text-sm font-black text-slate-800 leading-none">MCD CivicOS</h1>
-                        <p className="text-[10px] text-slate-400 font-bold mt-1">Govt. of NCT Delhi</p>
-                    </div>
+                    <button 
+                        onClick={() => setShowMobileSidebar(false)}
+                        className="p-2 hover:bg-slate-50 rounded-xl text-slate-400 lg:hidden"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
                 </div>
 
                 <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
@@ -347,11 +366,18 @@ export default function CitizenDashboard() {
             </aside>
 
             {/* Main Content */}
-            <main className="flex-1 ml-64 p-8">
+            <main className="flex-1 lg:ml-64 p-4 md:p-8">
                 {/* Header Section */}
-                <header className="flex justify-between items-center mb-8 bg-white/50 backdrop-blur-md p-4 rounded-3xl border border-white/50 shadow-sm sticky top-4 z-10">
-                    <div className="flex items-center gap-4 flex-1">
-                        <div className="relative flex-1">
+                <header className="flex items-center gap-4 mb-8 bg-white/50 backdrop-blur-md p-4 rounded-3xl border border-white/50 shadow-sm sticky top-4 z-10">
+                    <button 
+                        onClick={() => setShowMobileSidebar(true)}
+                        className="p-2 hover:bg-slate-100 rounded-xl text-slate-600 lg:hidden"
+                    >
+                        <Menu className="w-6 h-6" />
+                    </button>
+
+                    <div className="flex items-center gap-4 flex-1 overflow-hidden">
+                        <div className="relative flex-1 hidden sm:block">
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                             <input 
                                 type="text" 
@@ -368,10 +394,10 @@ export default function CitizenDashboard() {
                             >
                                 <div className="flex flex-col items-start">
                                     <div className="flex items-center gap-1">
-                                        <span className="text-[10px] font-black text-slate-800 uppercase tracking-widest">{activeZone}</span>
+                                        <span className="text-[10px] font-black text-slate-800 uppercase tracking-widest whitespace-nowrap">{activeZone}</span>
                                         <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${showZoneMenu ? 'rotate-180' : ''}`} />
                                     </div>
-                                    {currentAddress && <span className="text-[8px] font-bold text-slate-400 truncate max-w-[100px]">{currentAddress}</span>}
+                                    {currentAddress && <span className="text-[8px] font-bold text-slate-400 truncate max-w-[80px] sm:max-w-[100px]">{currentAddress}</span>}
                                 </div>
                             </div>
                             
@@ -401,7 +427,7 @@ export default function CitizenDashboard() {
                             className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${isRecording || isSpeaking ? 'bg-gov-blue/5 border-gov-blue/20 text-gov-blue animate-pulse' : 'bg-white border-slate-100 text-gov-blue hover:bg-slate-50'}`}
                         >
                             {isRecording || isSpeaking ? <Mic className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                            <span className="text-xs font-black uppercase tracking-widest">{isRecording ? "Listening..." : isSpeaking ? "Speaking..." : "Voice Assist"}</span>
+                            <span className="text-xs font-black uppercase tracking-widest hidden sm:inline">{isRecording ? "Listening..." : isSpeaking ? "Speaking..." : "Voice Assist"}</span>
                         </button>
 
                         <div className="relative">
@@ -433,7 +459,7 @@ export default function CitizenDashboard() {
                         </div>
 
                         <div className="relative flex items-center gap-3 pl-4 border-l border-slate-200">
-                            <div className="text-right">
+                            <div className="text-right hidden sm:block">
                                 <p className="text-sm font-black text-slate-800 leading-none">{userProfile?.name || "Citizen"}</p>
                                 <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-widest leading-none">Resident • {activeZone}</p>
                             </div>
@@ -491,7 +517,7 @@ export default function CitizenDashboard() {
 
                 <div className="space-y-8">
                     {/* Stats Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
                         <MISStatCard 
                             title="My Active Reports" 
                             value={stats.pendingReports + stats.inProgressReports} 
@@ -527,9 +553,9 @@ export default function CitizenDashboard() {
                     </div>
 
                     {/* AI Alert Card matches design */}
-                    <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-6 flex items-center justify-between shadow-sm animate-in zoom-in-95 duration-500">
+                    <div className="bg-blue-50/50 border border-blue-100 rounded-2xl p-4 md:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm animate-in zoom-in-95 duration-500">
                         <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-gov-blue shadow-inner">
+                            <div className="w-12 h-12 bg-blue-100 rounded-xl flex-shrink-0 flex items-center justify-center text-gov-blue shadow-inner">
                                 <Sparkles className="w-6 h-6" />
                             </div>
                             <div>
@@ -547,28 +573,28 @@ export default function CitizenDashboard() {
                         </div>
                         <a 
                             href="tel:01122591171"
-                            className="px-6 py-3 bg-gov-blue text-white text-xs font-black uppercase tracking-widest rounded-xl hover:bg-gov-blue shadow-lg shadow-gov-blue/20 transition-all active:scale-95 no-underline flex items-center justify-center"
+                            className="w-full md:w-auto px-6 py-3 bg-gov-blue text-white text-xs font-black uppercase tracking-widest rounded-xl hover:bg-gov-blue shadow-lg shadow-gov-blue/20 transition-all active:scale-95 no-underline flex items-center justify-center"
                         >
                             Contact Support
                         </a>
                     </div>
 
                     {/* Live Feed Table Section */}
-                    <div className="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden p-8">
-                        <div className="flex justify-between items-center mb-8">
+                    <div className="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden p-4 md:p-8">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
                             <h2 className="text-xl font-black text-slate-800">My Grievance History</h2>
-                            <div className="flex gap-3">
-                                <Link href="/map" className="w-full">
-                                    <button className="w-full py-2.5 bg-slate-50 text-gov-blue rounded-xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-slate-100 transition-colors">
+                            <div className="flex items-center gap-3 w-full sm:w-auto">
+                                <Link href="/map" className="flex-1 sm:flex-none">
+                                    <button className="w-full py-2.5 px-4 bg-slate-50 text-gov-blue rounded-xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-slate-100 transition-colors">
                                         <MapPin className="w-4 h-4" />
                                         LOCAL MAP
                                     </button>
                                 </Link>
                                 <button 
                                     onClick={refreshFeed}
-                                    className="px-4 py-2 bg-slate-50 text-gov-blue rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-gov-blue/5 transition-colors"
+                                    className="px-4 py-2.5 bg-slate-50 text-gov-blue rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-gov-blue/5 transition-colors"
                                 >
-                                    <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} /> Refresh
+                                    <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} /> <span className="hidden sm:inline">Refresh</span>
                                 </button>
                             </div>
                         </div>

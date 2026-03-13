@@ -263,7 +263,7 @@ export default function ReportPage() {
                     </Link>
                     <div>
                         <h1 className="text-sm font-black text-slate-800 uppercase tracking-widest">Report a Grievance</h1>
-                        <p className="text-[10px] text-slate-400 font-bold mt-0.5 uppercase tracking-wider">Digital Public Infrastructure for Delhi</p>
+                        <p className="text-[10px] text-slate-400 font-bold mt-0.5 uppercase tracking-wider hidden xs:block">Digital Public Infrastructure for Delhi</p>
                     </div>
                 </div>
                 <div className="w-8 h-8 bg-gov-blue rounded-lg flex items-center justify-center">
@@ -299,7 +299,7 @@ export default function ReportPage() {
                             </div>
                         </div>
 
-                        <div className="flex gap-4">
+                        <div className="flex flex-col sm:flex-row gap-4">
                             <button
                                 onClick={handleAIAnalyze}
                                 disabled={!description.trim() || isAnalyzing || isTranscribing}
@@ -312,14 +312,20 @@ export default function ReportPage() {
                             <button 
                                 onClick={isRecording ? stopRecording : startRecording}
                                 disabled={isAnalyzing || isTranscribing}
-                                className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-all ${isRecording ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                                className={`w-full sm:w-16 h-16 rounded-2xl flex items-center justify-center transition-all ${isRecording ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
                             >
                                 {isTranscribing ? (
                                     <Loader2 className="w-6 h-6 animate-spin" />
                                 ) : isRecording ? (
-                                    <Square className="w-6 h-6 fill-current" />
+                                    <div className="flex items-center gap-2">
+                                        <Square className="w-6 h-6 fill-current" />
+                                        <span className="sm:hidden font-black text-xs uppercase">Stop Recording</span>
+                                    </div>
                                 ) : (
-                                    <Mic className="w-6 h-6" />
+                                    <div className="flex items-center gap-2">
+                                        <Mic className="w-6 h-6" />
+                                        <span className="sm:hidden font-black text-xs uppercase">Voice Report</span>
+                                    </div>
                                 )}
                             </button>
                         </div>
@@ -349,7 +355,7 @@ export default function ReportPage() {
                         <div className="space-y-6">
                             <div>
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-3">Location Details</label>
-                                <div className="flex gap-3">
+                                <div className="flex flex-col sm:flex-row gap-3">
                                     <input
                                         type="text"
                                         value={location}
@@ -359,7 +365,7 @@ export default function ReportPage() {
                                     />
                                     <button 
                                         onClick={detectLocation}
-                                        className="px-6 bg-slate-900 text-white rounded-2xl transition-all hover:bg-slate-800 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest"
+                                        className="py-4 px-6 bg-slate-900 text-white rounded-2xl transition-all hover:bg-slate-800 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest"
                                     >
                                         {isDetecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
                                         {isDetecting ? "Detecting..." : "Detect"}
@@ -445,7 +451,7 @@ export default function ReportPage() {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <Link 
                                     href="/dashboard"
                                     className="py-4 bg-[#003366] text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-[#002244] transition-all shadow-lg flex items-center justify-center"

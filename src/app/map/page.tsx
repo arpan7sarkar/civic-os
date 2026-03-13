@@ -19,7 +19,9 @@ import {
     User,
     XCircle,
     Settings,
-    Loader2
+    Loader2,
+    Menu,
+    X
 } from "lucide-react";
 import Link from "next/link";
 import { getGrievancesAction } from "@/app/actions/grievance";
@@ -58,6 +60,7 @@ export default function MapPage() {
         address: ""
     });
     const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+    const [showMobileFilters, setShowMobileFilters] = useState(false);
     
     // Filters
     const [selectedCategories, setSelectedCategories] = useState<string[]>(['Streetlight', 'Garbage', 'Water Leakage', 'Road Damage', 'Encroachment']);
@@ -161,18 +164,25 @@ export default function MapPage() {
     return (
         <div className="flex flex-col h-screen overflow-hidden bg-white">
             {/* Header - Stitch Design */}
-            <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3 z-30">
-                <div className="flex items-center gap-8">
-                    <Link href="/dashboard" className="flex items-center gap-3 group">
+            <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 md:px-6 py-3 z-30">
+                <div className="flex items-center gap-4 md:gap-8">
+                    <button 
+                        onClick={() => setShowMobileFilters(true)}
+                        className="p-2 hover:bg-slate-100 rounded-xl text-slate-600 lg:hidden"
+                    >
+                        <Menu className="w-6 h-6" />
+                    </button>
+
+                    <Link href="/dashboard" className="flex items-center gap-2 md:gap-3 group">
                         <div className="bg-gov-blue p-1.5 rounded-lg text-white group-hover:bg-blue-800 transition-colors">
                             <LayoutDashboard className="w-5 h-5" />
                         </div>
-                        <div>
-                            <h1 className="text-gov-blue text-lg font-bold leading-tight tracking-tight">CivicOS</h1>
-                            <p className="text-[10px] uppercase tracking-wider font-extrabold text-slate-400">Delhi Municipal Corporation</p>
+                        <div className="hidden xs:block">
+                            <h1 className="text-gov-blue text-sm md:text-lg font-bold leading-tight tracking-tight">CivicOS</h1>
+                            <p className="text-[8px] md:text-[10px] uppercase tracking-wider font-extrabold text-slate-400">Delhi Municipal Corporation</p>
                         </div>
                     </Link>
-                    <nav className="hidden md:flex items-center gap-6">
+                    <nav className="hidden lg:flex items-center gap-6">
                         <Link href="/dashboard" className="text-slate-600 text-sm font-bold hover:text-gov-blue transition-colors">Dashboard</Link>
                         <span className="text-gov-blue text-sm font-bold border-b-2 border-gov-blue pb-1">Spatial Map</span>
                         <Link href="/report" className="text-slate-600 text-sm font-bold hover:text-gov-blue transition-colors">File Report</Link>
@@ -221,17 +231,22 @@ export default function MapPage() {
                         <div className="relative">
                             <div 
                                 onClick={() => setShowProfileMenu(!showProfileMenu)}
-                                className="h-10 w-10 rounded-xl bg-slate-200 border border-slate-300 overflow-hidden cursor-pointer hover:ring-4 hover:ring-gov-blue/10 transition-all active:scale-95 shadow-md flex items-center justify-center p-0"
+                                className="h-9 w-9 md:h-10 md:w-10 rounded-xl bg-slate-200 border border-slate-300 overflow-hidden cursor-pointer hover:ring-4 hover:ring-gov-blue/10 transition-all active:scale-95 shadow-md flex items-center justify-center p-0"
                             >
                                 {userProfile?.profileImageUrl ? (
                                     <img src={userProfile.profileImageUrl} alt="Profile" className="w-full h-full object-cover" />
                                 ) : (
-                                    <span className="text-gov-blue font-black uppercase text-xs">{userProfile?.name?.charAt(0) || 'C'}</span>
+                                    <span className="text-gov-blue font-black uppercase text-[10px] md:text-xs">{userProfile?.name?.charAt(0) || 'C'}</span>
                                 )}
                             </div>
 
                             {showProfileMenu && (
                                 <div className="absolute top-full right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 animate-in fade-in slide-in-from-top-2">
+                                    <div className="px-4 py-2 border-b border-slate-50 lg:hidden">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Navigation</p>
+                                        <Link href="/dashboard" className="block py-1 text-xs font-bold text-slate-600 hover:text-gov-blue">Dashboard</Link>
+                                        <Link href="/report" className="block py-1 text-xs font-bold text-slate-600 hover:text-gov-blue">File Report</Link>
+                                    </div>
                                     <button 
                                         onClick={() => { setShowMyProfileModal(true); setShowProfileMenu(false); }}
                                         className="w-full text-left px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors flex items-center gap-2"
@@ -262,8 +277,29 @@ export default function MapPage() {
             </header>
 
             <div className="flex flex-1 overflow-hidden relative">
+                {/* Mobile Filter Overlay */}
+                {showMobileFilters && (
+                    <div 
+                        className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[45] lg:hidden"
+                        onClick={() => setShowMobileFilters(false)}
+                    />
+                )}
+
                 {/* Sidebar - Stitch Design */}
-                <aside className="w-80 bg-white border-r border-slate-200 flex flex-col z-20 shadow-xl overflow-y-auto">
+                <aside className={`w-80 bg-white border-r border-slate-200 flex flex-col fixed inset-y-0 left-0 z-50 transition-transform duration-300 lg:relative lg:translate-x-0 ${showMobileFilters ? 'translate-x-0' : '-translate-x-full'} shadow-2xl lg:shadow-none overflow-y-auto`}>
+                    <div className="p-6 flex items-center justify-between border-b border-slate-50 lg:hidden">
+                        <div className="flex items-center gap-2">
+                            <Filter className="w-5 h-5 text-gov-blue" />
+                            <h2 className="text-lg font-black text-slate-800 tracking-tight">MAP FILTERS</h2>
+                        </div>
+                        <button 
+                            onClick={() => setShowMobileFilters(false)}
+                            className="p-2 hover:bg-slate-50 rounded-xl text-slate-400"
+                        >
+                            <X className="w-5 h-5" />
+                        </button>
+                    </div>
+
                     <div className="p-6 space-y-8">
                         <div>
                             <div className="flex items-center justify-between mb-6">
@@ -330,12 +366,12 @@ export default function MapPage() {
                                 <Info className="w-4 h-4" />
                             </div>
                             <p className="text-[10px] font-bold text-slate-500 leading-relaxed uppercase tracking-wider">
-                                Showing {filteredGrievances.length} active civic reports across your jurisdiction.
+                                Showing {filteredGrievances.length} active civic reports.
                             </p>
                         </div>
                         <button className="w-full py-3 bg-gov-blue text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-800 transition-all shadow-lg shadow-blue-200 flex items-center justify-center gap-2">
                             <Download className="w-4 h-4" />
-                            Export Live Data
+                            Export Data
                         </button>
                     </div>
                 </aside>
@@ -348,42 +384,39 @@ export default function MapPage() {
                     />
 
                     {/* Map Controls */}
-                    <div className="absolute top-6 right-6 flex flex-col gap-3 z-20">
+                    <div className="absolute top-4 right-4 md:top-6 md:right-6 flex flex-col gap-2 md:gap-3 z-20">
                         <div className="flex flex-col rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
-                            <button className="p-4 hover:bg-slate-50 border-b border-slate-100 text-slate-600 transition-colors">
-                                <Plus className="w-5 h-5" />
+                            <button className="p-3 md:p-4 hover:bg-slate-50 border-b border-slate-100 text-slate-600 transition-colors">
+                                <Plus className="w-4 md:w-5 h-4 md:h-5" />
                             </button>
-                            <button className="p-4 hover:bg-slate-50 text-slate-600 transition-colors">
-                                <Minus className="w-5 h-5" />
+                            <button className="p-3 md:p-4 hover:bg-slate-50 text-slate-600 transition-colors">
+                                <Minus className="w-4 md:w-5 h-4 md:h-5" />
                             </button>
                         </div>
                         <button 
                             onClick={handleMyLocation}
-                            className="p-4 bg-white rounded-2xl shadow-2xl border border-slate-200 hover:bg-slate-50 text-gov-blue transition-all active:scale-95"
+                            className="p-3 md:p-4 bg-white rounded-2xl shadow-2xl border border-slate-200 hover:bg-slate-50 text-gov-blue transition-all active:scale-95"
                         >
-                            <Navigation className="w-5 h-5" />
-                        </button>
-                        <button className="p-4 bg-white rounded-2xl shadow-2xl border border-slate-200 hover:bg-slate-50 text-slate-600">
-                            <Layers className="w-5 h-5" />
+                            <Navigation className="w-4 md:w-5 h-4 md:h-5" />
                         </button>
                     </div>
 
                     {/* Map Legend */}
-                    <div className="absolute bottom-8 right-8 z-20">
-                        <div className="bg-white/90 backdrop-blur-md p-5 rounded-3xl shadow-2xl border border-white w-52 overflow-hidden relative">
+                    <div className="absolute bottom-6 right-6 md:bottom-8 md:right-8 z-20 hidden xs:block">
+                        <div className="bg-white/90 backdrop-blur-md p-4 md:p-5 rounded-3xl shadow-2xl border border-white w-44 md:w-52 overflow-hidden relative">
                             <div className="absolute top-0 left-0 w-full h-1 bg-gov-blue"></div>
-                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Map Legend</h4>
-                            <div className="space-y-4">
+                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 md:mb-4">Legend</h4>
+                            <div className="space-y-3 md:space-y-4">
                                 {[
-                                    { label: 'Pending', desc: 'Newly Reported', color: 'text-red-500' },
-                                    { label: 'In Progress', desc: 'Work Underway', color: 'text-amber-500' },
-                                    { label: 'Resolved', desc: 'Task Completed', color: 'text-emerald-500' }
+                                    { label: 'Pending', desc: 'New', color: 'text-red-500' },
+                                    { label: 'In Progress', desc: 'Active', color: 'text-amber-500' },
+                                    { label: 'Resolved', desc: 'Done', color: 'text-emerald-500' }
                                 ].map(item => (
-                                    <div key={item.label} className="flex items-center gap-3">
-                                        <MapPin className={`w-5 h-5 ${item.color} fill-current`} />
+                                    <div key={item.label} className="flex items-center gap-2 md:gap-3">
+                                        <MapPin className={`w-4 h-4 md:w-5 md:h-5 ${item.color} fill-current`} />
                                         <div className="flex flex-col">
-                                            <span className="text-xs font-black text-slate-700">{item.label}</span>
-                                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">{item.desc}</span>
+                                            <span className="text-[10px] md:text-xs font-black text-slate-700">{item.label}</span>
+                                            <span className="text-[8px] md:text-[9px] font-bold text-slate-400 uppercase tracking-tighter">{item.desc}</span>
                                         </div>
                                     </div>
                                 ))}
@@ -392,13 +425,13 @@ export default function MapPage() {
                     </div>
 
                     {/* Coordinates Overlay */}
-                    <div className="absolute bottom-8 left-8 z-20">
-                        <div className="flex items-center gap-2 bg-slate-900/80 backdrop-blur-md px-4 py-2 rounded-full shadow-2xl border border-slate-700">
+                    <div className="absolute bottom-6 left-6 md:bottom-8 md:left-8 z-20">
+                        <div className="flex items-center gap-2 bg-slate-900/80 backdrop-blur-md px-3 md:px-4 py-1.5 md:py-2 rounded-full shadow-2xl border border-slate-700">
                             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
-                            <span className="text-[10px] font-black text-white uppercase tracking-widest">
+                            <span className="text-[8px] md:text-[10px] font-black text-white uppercase tracking-widest">
                                 {userLocation 
-                                    ? `Lat: ${userLocation[0].toFixed(4)}° N, Long: ${userLocation[1].toFixed(4)}° E` 
-                                    : 'Delhi Jurisdiction Active'}
+                                    ? `${userLocation[0].toFixed(3)}° N, ${userLocation[1].toFixed(3)}° E` 
+                                    : 'Delhi Live'}
                             </span>
                         </div>
                     </div>
