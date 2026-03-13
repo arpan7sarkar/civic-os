@@ -26,11 +26,15 @@ export async function getServerProfileAction() {
         }
 
         const user = await account.get();
+        console.log(`[PROFILE_ACTION] Found user: ${user.$id} (${user.name || 'No Name'})`);
+        
         const response = await databases.listDocuments({
             databaseId: DATABASE_ID,
             collectionId: PROFILES_COLLECTION_ID,
             queries: [Query.equal('userId', user.$id)]
         });
+
+        console.log(`[PROFILE_ACTION] Profile search for ${user.$id}: ${response.documents.length} docs found`);
 
         if (response.documents.length > 0) {
             const profile = JSON.parse(JSON.stringify(response.documents[0]));

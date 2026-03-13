@@ -23,10 +23,20 @@ export default function RegisterProfilePage() {
             if (success && user) {
                 setUserId(user.$id);
             } else {
-                router.push('/auth');
+                // If we just redirected from Auth, maybe the cookie is still landing
+                console.log("[REGISTER] No session yet, retrying in 1s...");
+                setTimeout(async () => {
+                    const retry = await getCurrentUserAction();
+                    if (retry.success && retry.user) {
+                        setUserId(retry.user.$id);
+                    } else {
+                        router.replace('/auth');
+                    }
+                }, 1000);
             }
         };
         checkAuth();
+        router.refresh();
     }, [router]);
 
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {

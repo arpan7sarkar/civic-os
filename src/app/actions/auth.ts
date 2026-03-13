@@ -46,7 +46,7 @@ export async function verifyOTPAction(userId: string, secret: string) {
                 path: '/',
                 httpOnly: true,
                 secure: process.env.NODE_ENV === 'production',
-                sameSite: 'strict',
+                sameSite: 'lax', // Relaxed for better reliability across redirects
                 expires: new Date(session.expire),
             });
             console.log(`[VERIFY_OTP] Session cookie set: ${cookieName}`);

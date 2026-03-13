@@ -26,15 +26,14 @@ export default function AuthPage() {
 
     useEffect(() => {
         setCaptchaText(generateCaptcha(6));
-        
-        // Prevent session collision: Redirect if already logged in
         const checkSession = async () => {
             const { success } = await getCurrentUserAction();
             if (success) {
-                router.push('/dashboard');
+                router.replace('/dashboard');
             }
         };
         checkSession();
+        router.refresh(); 
     }, [router]);
 
     const handleGenerateOTP = async () => {
@@ -81,15 +80,19 @@ export default function AuthPage() {
             const result = await verifyOTPAction(userId, otpValue);
             
             if (result.success) {
-                setSuccess('Authenticated successfully! Redirecting...');
+                setSuccess('Authenticated successfully! Refreshing session...');
+                router.refresh(); 
                 
-                // 2. Check for profile
-                const profileResult = await getServerProfileAction();
-                if (profileResult.success && profileResult.profile) {
-                    router.replace('/dashboard');
-                } else {
-                    router.replace('/auth/register');
-                }
+                // Wait for session to sync before checking profile
+                setTimeout(async () => {
+                    setSuccess('Checking profile status...');
+                    const profileResult = await getServerProfileAction();
+                    if (profileResult.success && profileResult.profile) {
+                        router.replace('/dashboard');
+                    } else {
+                        router.replace('/auth/register');
+                    }
+                }, 800);
             } else {
                 setError(result.error || 'Invalid OTP. Please try again.');
             }
@@ -222,9 +225,9 @@ export default function AuthPage() {
 
                                     <div>
                                         <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 px-1 text-center">Enter Verification Code</label>
-                                        <div className="flex justify-between gap-2 md:gap-3">
+                                        <div className="flex justify-center gap-3 md:gap-4 mt-4">
                                             {otpArray.map((digit, index) => (
-                                                <div key={index} className="relative flex-1">
+                                                <div key={index} className="relative">
                                                     <input 
                                                         id={`otp-${index}`}
                                                         type="text"
@@ -260,16 +263,16 @@ export default function AuthPage() {
                                                                 prevInput?.focus();
                                                             }
                                                         }}
-                                                        className={`w-full aspect-square md:h-16 bg-slate-50 border-2 rounded-xl text-2xl font-black text-center transition-all outline-none flex items-center justify-center
+                                                        className={`w-12 h-14 md:h-20 md:w-20 bg-slate-50 border-2 rounded-2xl text-3xl font-black text-center transition-all outline-none flex items-center justify-center
                                                             ${peekIndex === index || !digit ? 'text-gov-blue' : 'text-transparent'}
-                                                            ${digit ? 'border-gov-blue/20 bg-white' : 'border-slate-100'}
-                                                            focus:border-gov-blue focus:ring-4 focus:ring-gov-blue/5`}
+                                                            ${digit ? 'border-gov-blue/20 bg-white shadow-md' : 'border-slate-100'}
+                                                            focus:border-gov-blue focus:ring-8 focus:ring-gov-blue/5`}
                                                         placeholder="•"
                                                     />
                                                     {/* Mask overlay for secret effect */}
                                                     {digit && peekIndex !== index && (
                                                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                                            <div className="w-2.5 h-2.5 bg-gov-blue rounded-full" />
+                                                            <div className="w-3 h-3 bg-gov-blue rounded-full" />
                                                         </div>
                                                     )}
                                                 </div>
