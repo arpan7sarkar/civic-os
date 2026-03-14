@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getCurrentUserAction } from '@/app/actions/auth';
-import { createProfileWithImageAction } from '@/app/actions/profile';
+import { createProfileWithImageAction, getServerProfileAction, updateUserProfileAction } from '@/app/actions/profile';
 import { User, IdCard, Camera, ChevronRight, Loader2, AlertCircle, Plus } from 'lucide-react';
 
 export default function RegisterProfilePage() {
@@ -26,9 +26,10 @@ export default function RegisterProfilePage() {
             if (success && user) {
                 setUserId(user.$id);
                 
-                // If user already has a name/profile, they shouldn't be here
-                if (user.name && !user.name.includes('Bridge')) {
-                    console.log("[REGISTER] Profile already exists, redirecting to dashboard");
+                // If user already has a valid name/profile, they shouldn't be here
+                const isGlitchUser = !user.name || user.name.includes('Bridge');
+                if (!isGlitchUser) {
+                    console.log("[REGISTER] Profile already complete, redirecting to dashboard");
                     router.replace('/dashboard');
                 }
             } else if (retries < maxRetries) {
@@ -71,15 +72,30 @@ export default function RegisterProfilePage() {
                 formData.append('image', imageFile);
             }
 
-            const result = await createProfileWithImageAction(formData);
+            // Check if we need to CREATE or UPDATE
+            const { isFullProfile } = await getServerProfileAction();
+            let result;
+            
+            if (isFullProfile) {
+                console.log("[REGISTER] Updating existing profile...");
+                result = await updateUserProfileAction({
+                    userId,
+                    name,
+                    govIdType,
+                    govIdNumber
+                });
+            } else {
+                console.log("[REGISTER] Creating new profile...");
+                result = await createProfileWithImageAction(formData);
+            }
             
             if (result.success) {
                 router.replace('/dashboard');
             } else {
-                setError(result.error || 'Failed to create profile.');
+                setError(result.error || 'Failed to save profile.');
             }
         } catch (err: any) {
-            setError('An unexpected error occurred during profile creation.');
+            setError('An unexpected error occurred during profile processing.');
         } finally {
             setIsLoading(false);
         }
@@ -90,7 +106,7 @@ export default function RegisterProfilePage() {
             <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-100 p-8 md:p-12 animate-in fade-in slide-in-from-bottom-4">
                 <div className="text-center mb-10">
                     <img src="/logo1.png" alt="MCD Logo" className="w-16 h-16 object-contain mx-auto mb-4" />
-                    <h1 className="text-2xl font-black text-slate-900">Complete Your Profile</h1>
+                    <h1 className="text-2xl font-black text-slate-900">Mandatory Profile Update</h1>
                     <p className="text-slate-500 text-sm font-medium mt-2">Secure digital identity established via OTP. Please provide required details.</p>
                 </div>
 
