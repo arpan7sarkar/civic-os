@@ -67,7 +67,7 @@ export async function getCurrentUserAction() {
 
         if (!sessionSecret && !bridgeUserId) {
             console.warn(`[AUTH_ACTION] No session found`);
-            return { success: false, error: 'NO_SESSION' };
+            return JSON.parse(JSON.stringify({ success: false, error: 'NO_SESSION' }));
         }
 
         const { account: serverAccount } = createAppwriteClient(sessionSecret);
@@ -85,10 +85,16 @@ export async function getCurrentUserAction() {
             status: user.status
         };
 
-        return JSON.parse(JSON.stringify({ success: true, user: sanitizedUser }));
+        return JSON.parse(JSON.stringify({ 
+            success: true, 
+            user: sanitizedUser 
+        }));
     } catch (error: any) {
-        console.error("[AUTH_ACTION] Get Current User Error:", error.message);
-        return JSON.parse(JSON.stringify({ success: false, error: error.message }));
+        console.error("[AUTH_ACTION] Get Current User Error:", error?.message || error);
+        return JSON.parse(JSON.stringify({ 
+            success: false, 
+            error: error?.message || String(error) 
+        }));
     }
 }
 

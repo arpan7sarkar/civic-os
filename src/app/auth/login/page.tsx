@@ -100,16 +100,19 @@ export default function LoginPage() {
             if (session && handoffResult.success) {
                 setSuccess('Authenticated successfully! Redirecting...');
                 
-                // Check if profile exists; if not, redirect to /auth/register
-                console.log('[LOGIN] Verifying profile existence...');
-                const userResult = await getCurrentUserAction();
-                console.log('[LOGIN] Profile check result:', userResult);
-
-                if (userResult.success && !userResult.user?.name) {
-                    console.log('[LOGIN] No profile found, routing to register');
-                    window.location.href = '/auth/register';
-                } else {
-                    console.log('[LOGIN] Profile found or fallback, routing to dashboard');
+                // 4. Verify profile existence ON CLIENT directly
+                console.log('[LOGIN] Verifying profile existence on client...');
+                try {
+                    const user = await account.get();
+                    if (user && !user.name) {
+                        console.log('[LOGIN] No profile found, routing to register');
+                        window.location.href = '/auth/register';
+                    } else {
+                        console.log('[LOGIN] Profile found, routing to dashboard');
+                        window.location.href = '/dashboard';
+                    }
+                } catch (userErr) {
+                    console.error('[LOGIN] Static profile check failed, using fallback redirect to dashboard');
                     window.location.href = '/dashboard';
                 }
             } else {
