@@ -27,6 +27,13 @@ export default function Hero() {
     const handleAnalyze = async () => {
         if (!description.trim()) return;
 
+        // Session Protection for AI Feature
+        if (currentUserId === 'anonymous') {
+            console.warn("[HERO] Unauthorized AI access attempt. Redirecting to login.");
+            window.location.href = '/auth';
+            return;
+        }
+
         setIsAnalyzing(true);
         setResult(null);
         setTicketId(null);

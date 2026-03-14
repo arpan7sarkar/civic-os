@@ -209,15 +209,15 @@ export default function CitizenDashboard() {
                     }
                 }
 
-                if (finalProfile) {
-                    console.log(`[DASHBOARD_CLIENT] Final Profile Resolved:`, finalProfile.userId);
+                if (finalProfile && result.isFullProfile) {
+                    console.log(`[DASHBOARD_CLIENT] Final Full Profile Resolved:`, finalProfile.userId);
                     setUserProfile(finalProfile);
                     
                     await loadData(finalProfile.userId);
                     setIsLoading(false);
                     clearTimeout(safetyTimeout);
 
-                    // Background enrichment - Load insight from existing data to avoid redundant AI API calls
+                    // Background enrichment - Load insight from existing data
                     const currentComplaints = getComplaints(finalProfile.userId);
                     if (currentComplaints.length > 0) {
                         const latest = currentComplaints[0];
@@ -232,13 +232,13 @@ export default function CitizenDashboard() {
                     if (retries < maxRetries) {
                         retries++;
                         console.log(`[DASHBOARD_CLIENT] Session missing/401, retrying ${retries}/${maxRetries}...`);
-                        setTimeout(initDashboard, 1000); // 1s wait between retries
+                        setTimeout(initDashboard, 1000);
                     } else {
                         console.log(`[DASHBOARD_CLIENT] Max retries reached. Redirecting to auth.`);
                         router.replace('/auth');
                     }
-                } else if (result.success && !result.profile) {
-                    console.log(`[DASHBOARD_CLIENT] No profile found. Redirecting to register.`);
+                } else if (result.success && !result.isFullProfile) {
+                    console.log(`[DASHBOARD_CLIENT] Profile incomplete or Bridge only. Redirecting to register.`);
                     clearTimeout(safetyTimeout);
                     router.replace('/auth/register');
                 } else {
@@ -352,6 +352,16 @@ export default function CitizenDashboard() {
                     
                     <div className="pt-8 pb-2 px-4 text-[10px] font-black text-slate-300 uppercase tracking-widest">Support</div>
                     <SidebarLink icon={<Settings className="w-4 h-4" />} label="Preferences" href="/dashboard" />
+                    
+                    <div className="pt-4 mt-auto">
+                        <button 
+                            onClick={handleLogout}
+                            className="w-full flex items-center gap-4 px-4 py-3 rounded-2xl text-sm font-bold text-red-500 hover:bg-red-50 transition-all"
+                        >
+                            <XCircle className="w-4 h-4 text-red-400" />
+                            <span>Logout Session</span>
+                        </button>
+                    </div>
                 </nav>
 
                 <div className="p-4 border-t border-slate-50">
@@ -515,36 +525,36 @@ export default function CitizenDashboard() {
                     {/* Stats Grid */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
                         <MISStatCard 
-                            title="My Active Reports" 
+                            title="Active Reports" 
                             value={stats.pendingReports + stats.inProgressReports} 
-                            trend="Real-time" 
+                            trend="Live" 
                             trendUp={true} 
-                            icon={<FileText className="text-gov-blue" />} 
-                            subtitle="Currently Processing"
+                            icon={<FileText className="text-gov-blue w-5 h-5" />} 
+                            subtitle="Processing"
                         />
                         <MISStatCard 
-                            title="Resolved Tickets" 
+                            title="Resolved" 
                             value={stats.resolvedReports} 
                             trend="Total" 
                             trendUp={true} 
-                            icon={<CheckCircle className="text-green-500" />} 
+                            icon={<CheckCircle className="text-green-500 w-5 h-5" />} 
                             subtitle="Successfully Closed"
                         />
                         <MISStatCard 
-                            title="Community Health" 
+                            title="Community" 
                             value={stats.citizenSatisfaction} 
                             trend="Local" 
                             trendUp={true} 
-                            icon={<Smile className="text-orange-500" />} 
-                            subtitle="Based on Ward Data"
+                            icon={<Smile className="text-orange-500 w-5 h-5" />} 
+                            subtitle="Ward Data"
                         />
                         <MISStatCard 
-                            title="Total Contributions" 
+                            title="Contributions" 
                             value={stats.totalReports} 
                             trend="Lifetime" 
                             trendUp={true} 
-                            icon={<TrendingUp className="text-indigo-500" />} 
-                            subtitle="Issues Reported"
+                            icon={<TrendingUp className="text-indigo-500 w-5 h-5" />} 
+                            subtitle="Issues Raised"
                         />
                     </div>
 
@@ -815,22 +825,22 @@ function SidebarLink({ icon, label, href, active = false }: { icon: any, label: 
 
 function MISStatCard({ title, value, trend, trendUp, icon, subtitle }: any) {
     return (
-        <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
-            <div className="flex justify-between items-start mb-6">
-                <div className="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center shadow-inner">
+        <div className="bg-white p-4 md:p-6 rounded-[24px] md:rounded-[32px] border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+            <div className="flex justify-between items-start mb-4 md:mb-6">
+                <div className="w-10 h-10 md:w-12 md:h-12 bg-slate-50 rounded-xl md:rounded-2xl flex items-center justify-center shadow-inner">
                     {icon}
                 </div>
-                <div className={`flex items-center gap-1 text-[11px] font-black ${trendUp ? 'text-green-500' : 'text-red-500'}`}>
-                    {trendUp ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                <div className={`flex items-center gap-1 text-[9px] md:text-[11px] font-black ${trendUp ? 'text-green-500' : 'text-red-500'}`}>
+                    {trendUp ? <TrendingUp className="w-2.5 h-2.5 md:w-3 md:h-3" /> : <TrendingDown className="w-2.5 h-2.5 md:w-3 md:h-3" />}
                     {trend}
                 </div>
             </div>
             <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{title}</p>
-                <p className="text-3xl font-black text-slate-800 mb-2">{value}</p>
-                <div className="flex items-center gap-2">
+                <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{title}</p>
+                <p className="text-2xl md:text-3xl font-black text-slate-800 mb-1 md:mb-2">{value}</p>
+                <div className="flex items-center gap-1.5 md:gap-2">
                     <div className="w-1 h-1 bg-slate-200 rounded-full" />
-                    <p className="text-[10px] text-slate-400 font-bold">{subtitle}</p>
+                    <p className="text-[9px] md:text-[10px] text-slate-400 font-bold">{subtitle}</p>
                 </div>
             </div>
         </div>

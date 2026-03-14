@@ -46,6 +46,7 @@ export async function getServerProfileAction() {
                 console.log(`[PROFILE_SERVER_V5] Falling back to Bridge UI for UID: ${bridgeUserId}`);
                 return { 
                     success: true, 
+                    isFullProfile: false,
                     profile: { 
                         userId: bridgeUserId, 
                         name: 'Citizen (Bridge Verified)', 
@@ -70,17 +71,18 @@ export async function getServerProfileAction() {
 
         if (response.documents.length > 0) {
             const profile = JSON.parse(JSON.stringify(response.documents[0]));
-            return { success: true, profile: profile as unknown as UserProfile };
+            return { success: true, isFullProfile: true, profile: profile as unknown as UserProfile };
         }
 
         // If no DB profile exists, return null so caller can redirect to register
         return { 
             success: true, 
+            isFullProfile: false,
             profile: null 
         };
     } catch (error: any) {
         console.error("[PROFILE_SERVER_V5] Error:", error.message);
-        return { success: false, error: error.message };
+        return { success: false, isFullProfile: false, error: error.message };
     }
 }
 

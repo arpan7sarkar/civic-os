@@ -90,7 +90,7 @@ function VerificationContent() {
             </div>
 
             {/* Comparison Cards */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-12">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 mt-4 md:mt-12">
                 {/* Citizen Report */}
                 <div className="bg-white rounded-[2rem] border border-gray-100 shadow-xl shadow-gray-200/50 overflow-hidden flex flex-col">
                     <div className="p-8 pb-4 flex justify-between items-center">
@@ -195,7 +195,7 @@ function VerificationContent() {
             </div>
 
             {/* Feedback Section */}
-            <div className="bg-white rounded-[2rem] border border-gray-100 shadow-xl p-10 space-y-8">
+            <div className="bg-white rounded-[2rem] border border-gray-100 shadow-xl p-6 md:p-10 space-y-6 md:space-y-8">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
                     <div className="space-y-4">
                         <h2 className="text-2xl font-black text-mcd-navy">Citizen Verification</h2>
@@ -209,18 +209,18 @@ function VerificationContent() {
                             "AI analyzed post-repair evidence matches pre-repair complaint visual profile."
                         </p>
                     </div>
-                    <div className="flex gap-4">
+                    <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
                         <button
                             onClick={() => handleUpdateStatus('In Progress')}
                             disabled={complaint.status === 'In Progress'}
-                            className="px-8 py-4 bg-white border-2 border-orange-500 rounded-2xl text-orange-600 font-black flex items-center gap-2 hover:bg-orange-50 transition-all uppercase tracking-widest text-sm shadow-lg shadow-orange-500/10 disabled:opacity-50"
+                            className="w-full sm:w-auto px-8 py-4 bg-white border-2 border-orange-500 rounded-2xl text-orange-600 font-black flex items-center justify-center gap-2 hover:bg-orange-50 transition-all uppercase tracking-widest text-xs sm:text-sm shadow-lg shadow-orange-500/10 disabled:opacity-50"
                         >
                             <RotateCcw className="w-4 h-4" /> Re-open Case
                         </button>
                         <button
                             onClick={() => handleUpdateStatus('Resolved')}
                             disabled={complaint.status === 'Resolved'}
-                            className="px-10 py-4 bg-mcd-navy border-2 border-mcd-navy rounded-2xl text-white font-black flex items-center gap-2 hover:bg-mcd-navy/90 transition-all uppercase tracking-widest text-sm shadow-xl shadow-mcd-navy/20 disabled:opacity-50"
+                            className="w-full sm:w-auto px-10 py-4 bg-mcd-navy border-2 border-mcd-navy rounded-2xl text-white font-black flex items-center justify-center gap-2 hover:bg-mcd-navy/90 transition-all uppercase tracking-widest text-xs sm:text-sm shadow-xl shadow-mcd-navy/20 disabled:opacity-50"
                         >
                             <CheckCircle className="w-5 h-5" /> Confirm Resolution
                         </button>
