@@ -38,9 +38,10 @@ import {
 import { logoutAction } from "@/app/actions/auth";
 import { getServerProfileAction, UserProfile, updateUserProfileAction } from "@/app/actions/profile";
 import { reverseGeocodeAction } from "@/app/actions/geo";
-import { getComplaints, updateComplaint, getStats } from "@/lib/store";
+import { getComplaints, updateComplaint, getStats, syncGrievances } from "@/lib/store";
 import { Complaint } from "@/lib/types";
 import { analyzeIssueAction, transcribeAudioAction, textToSpeechAction } from "@/app/actions/ai";
+import { getGrievancesAction } from "@/app/actions/grievance";
 import { generateGrievancePDF } from "@/lib/pdf";
 
 export default function CitizenDashboard() {
@@ -57,7 +58,7 @@ export default function CitizenDashboard() {
     const [isLoading, setIsLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
-    const [activeZone, setActiveZone] = useState("South Delhi");
+    const [activeZone, setActiveZone] = useState("All India");
     const [aiInsight, setAiInsight] = useState<any>(null);
 
     // Menu States
@@ -147,6 +148,17 @@ export default function CitizenDashboard() {
     }, []);
 
     const loadData = async (uid: string) => {
+        // First try to load from cloud for fresh data
+        console.log(`[DASHBOARD_CLIENT] Fetching cloud grievances for sync...`);
+        try {
+            const cloudRes = await getGrievancesAction();
+            if (cloudRes.success && cloudRes.grievances) {
+                syncGrievances(cloudRes.grievances, uid);
+            }
+        } catch (e) {
+            console.warn("[DASHBOARD_CLIENT] Cloud sync failed, falling back to local storage:", e);
+        }
+
         const allComplaints = getComplaints(uid);
         const filtered = allComplaints.filter(c => 
             c.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -337,7 +349,7 @@ export default function CitizenDashboard() {
                         <img src="/logo1.png" alt="MCD Logo" className="w-10 h-10 object-contain" />
                         <div>
                             <h1 className="text-sm font-black text-slate-800 leading-none">MCD CivicOS</h1>
-                            <p className="text-[10px] text-slate-400 font-bold mt-1">Govt. of NCT Delhi</p>
+                            <p className="text-[10px] text-slate-400 font-bold mt-1">Govt. of India</p>
                         </div>
                     </div>
                     <button 
@@ -413,7 +425,7 @@ export default function CitizenDashboard() {
                             
                             {showZoneMenu && (
                                 <div className="absolute top-full left-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 animate-in fade-in slide-in-from-top-2">
-                                    {["South Delhi", "North Delhi", "East Delhi", "West Delhi", "Central Delhi"].map((zone) => (
+                                    {["All India", "North Zone", "South Zone", "East Zone", "West Zone", "Central Zone"].map((zone) => (
                                         <button
                                             key={zone}
                                             onClick={() => {
@@ -638,7 +650,7 @@ export default function CitizenDashboard() {
                                             </td>
                                             <td className="px-4 py-6">
                                                 <p className="text-sm font-bold text-slate-800">{item.ward}</p>
-                                                <p className="text-[10px] text-slate-400 font-medium">South District</p>
+                                                <p className="text-[10px] text-slate-400 font-medium">National Jurisdiction</p>
                                             </td>
                                             <td className="px-4 py-6">
                                                 <span className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${

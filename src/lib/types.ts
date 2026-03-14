@@ -4,7 +4,8 @@ export type ComplaintCategory =
     | 'Water Leakage'
     | 'Road Damage'
     | 'Encroachment'
-    | 'Illegal Parking';
+    | 'Illegal Parking'
+    | 'Other';
 
 export type Priority = 'Critical' | 'High' | 'Medium' | 'Low';
 
@@ -25,10 +26,12 @@ export interface Complaint {
     userId: string;
     citizenPhoto?: string;
     repairPhoto?: string;
+    rawDescription?: string;
 }
 
 export interface AnalysisResult {
     category: ComplaintCategory;
     priority: Priority;
     department: string;
+    refinedDescription?: string;
 }

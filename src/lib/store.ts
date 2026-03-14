@@ -25,6 +25,47 @@ interface InfrastructureAlert {
     severity: 'Critical' | 'High' | 'Medium' | 'Low';
 }
 
+/**
+ * Sync Appwrite grievances with local storage for MIS consistency
+ */
+export function syncGrievances(cloudGrievances: any[], userId: string) {
+    if (typeof window === 'undefined') return;
+    
+    const stored = localStorage.getItem(STORAGE_KEY);
+    let localGrievances: Complaint[] = stored ? JSON.parse(stored) : [];
+    
+    // Convert cloud format to local Complaint type if needed
+    const normalizedCloud = cloudGrievances.map(doc => ({
+        id: doc.$id || doc.id,
+        userId: doc.userId,
+        description: doc.description,
+        category: doc.category,
+        priority: doc.priority,
+        department: doc.department,
+        ward: doc.ward,
+        lat: doc.lat,
+        lng: doc.lng,
+        status: doc.status || 'Pending',
+        assignedTo: doc.assignedTo,
+        createdAt: doc.createdAt || doc.$createdAt,
+        citizenPhoto: doc.citizenPhoto,
+        repairPhoto: doc.repairPhoto
+    } as Complaint));
+
+    // Merge: Cloud data wins for existing IDs
+    const merged = [...normalizedCloud];
+    
+    // Add local-only ones (like demo data or unsynced ones)
+    localGrievances.forEach(local => {
+        if (!normalizedCloud.find(c => c.id === local.id)) {
+            merged.push(local);
+        }
+    });
+
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+    return merged;
+}
+
 export function getComplaints(userId?: string): Complaint[] {
     if (typeof window === 'undefined') return [];
     const stored = localStorage.getItem(STORAGE_KEY);

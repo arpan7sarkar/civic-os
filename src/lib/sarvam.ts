@@ -16,11 +16,20 @@ export async function transcribeAudio(base64Audio: string) {
 
     try {
         const buffer = Buffer.from(base64Audio, 'base64');
-        const response = await sarvamClient.speechToText.transcribe({
-            file: buffer as any,
-            model: "saaras:v3",
-            mode: "transcribe"
-        });
+        const transcribeWithTimeout = async () => {
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error("Sarvam Transcription Timed Out")), 15000);
+            });
+
+            const callPromise = sarvamClient.speechToText.transcribe({
+                file: buffer as any,
+                model: "saaras:v3",
+                mode: "transcribe"
+            });
+            return Promise.race([callPromise, timeoutPromise]) as Promise<any>;
+        };
+
+        const response = await transcribeWithTimeout();
         return response;
     } catch (error) {
         console.error("Sarvam STT Error:", error);
@@ -37,12 +46,21 @@ export async function textToSpeech(text: string, speaker: string = "shubh", lang
     }
 
     try {
-        const response = await sarvamClient.textToSpeech.convert({
-            text,
-            model: "bulbul:v3",
-            speaker: speaker as any,
-            target_language_code: languageCode as any
-        });
+        const convertWithTimeout = async () => {
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error("Sarvam TTS Timed Out")), 15000);
+            });
+
+            const callPromise = sarvamClient.textToSpeech.convert({
+                text,
+                model: "bulbul:v3",
+                speaker: speaker as any,
+                target_language_code: languageCode as any
+            });
+            return Promise.race([callPromise, timeoutPromise]) as Promise<any>;
+        };
+
+        const response = await convertWithTimeout();
         return response.audios;
     } catch (error) {
         console.error("Sarvam TTS Error:", error);

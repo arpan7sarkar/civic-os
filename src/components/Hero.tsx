@@ -53,8 +53,8 @@ export default function Hero() {
                 category: analysis.category,
                 priority: analysis.priority,
                 department: analysis.department,
-                lat: 28.6139 + (Math.random() - 0.5) * 0.1, // Random Delhi coords
-                lng: 77.2090 + (Math.random() - 0.5) * 0.1,
+                lat: 20.5937 + (Math.random() - 0.5) * 10, // Random India-wide coords
+                lng: 78.9629 + (Math.random() - 0.5) * 10,
                 status: 'Pending',
                 assignedTo: 'Officer Unassigned',
                 createdAt: new Date().toISOString(),
@@ -81,10 +81,10 @@ export default function Hero() {
             <div className="container mx-auto px-4 md:px-10 lg:px-20 relative z-10">
                 <div className="text-center max-w-4xl mx-auto mb-16">
                     <h1 className="text-slate-900 text-4xl md:text-6xl font-black leading-tight tracking-tight mb-6">
-                        A Smarter, Cleaner Delhi for Every Citizen
+                        A Smarter, Cleaner India for Every Citizen
                     </h1>
                     <p className="text-slate-600 text-lg md:text-xl font-normal leading-relaxed mb-10 max-w-2xl mx-auto">
-                        Report civic issues, track resolutions, and connect directly with MCD departments in real-time. Together, we build a better city.
+                        Report civic issues, track resolutions, and connect directly with government departments in real-time. Together, we build a better nation.
                     </p>
                     
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4">

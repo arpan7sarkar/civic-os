@@ -14,8 +14,8 @@ const roboto = Roboto({
 });
 
 export const metadata: Metadata = {
-  title: "CivicOS | Municipal Corporation of Delhi",
-  description: "Official AI-Powered PS-CRM for MCD - Building a Smarter, Cleaner Delhi.",
+  title: "CivicOS | National Public Infrastructure",
+  description: "Official AI-Powered PS-CRM for India - Building a Smarter, Cleaner Country.",
   icons: {
     icon: '/logo1.png',
   },

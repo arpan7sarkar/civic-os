@@ -72,7 +72,7 @@ function VerificationContent() {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                 <div className="space-y-2">
                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Cases • Verification</p>
-                    <h1 className="text-4xl font-black text-mcd-navy tracking-tight">Resolution Verification</h1>
+                    <h1 className="text-4xl font-black text-mcd-navy tracking-tight">National Resolution Verification</h1>
                     <div className="flex items-center gap-4 text-sm font-bold text-mcd-slate">
                         <span className="bg-gray-100 px-3 py-1 rounded">Case ID: <span className="text-mcd-navy">{complaint.id}</span></span>
                         <span className="flex items-center gap-1"><MapPin className="w-4 h-4 text-red-500" /> {complaint.ward}</span>
@@ -255,7 +255,7 @@ export default function VerificationPage() {
                     <CheckSquare className="w-4 h-4 text-green-500" /> Compliant with GIGW & WCAG 2.1 standards
                 </div>
                 <div>
-                    © 2026 MCD CIVICOS | GOVT. OF NCT DELHI
+                    © 2026 CIVICOS NATIONAL | GOVT. OF INDIA
                 </div>
                 <div className="flex gap-6">
                     <a href="#" className="hover:text-mcd-navy transition-colors">Help Desk</a>

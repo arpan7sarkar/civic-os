@@ -8,7 +8,16 @@ export async function reverseGeocodeAction(lat: number, lon: number) {
     }
 
     try {
-        const response = await fetch(`https://api.geoapify.com/v1/geocode/reverse?lat=${lat}&lon=${lon}&apiKey=${apiKey}`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+
+        const response = await fetch(
+            `https://api.geoapify.com/v1/geocode/reverse?lat=${lat}&lon=${lon}&apiKey=${apiKey}`,
+            { signal: controller.signal }
+        );
+        
+        clearTimeout(timeoutId);
+
         if (!response.ok) {
             throw new Error(`Geoapify error: ${response.statusText}`);
         }
@@ -20,8 +29,12 @@ export async function reverseGeocodeAction(lat: number, lon: number) {
         }
 
         return JSON.parse(JSON.stringify({ success: false, error: "NO_ADDRESS_FOUND" }));
-    } catch (error) {
-        console.error("Reverse Geocoding Error:", error);
+    } catch (error: any) {
+        if (error.name === 'AbortError') {
+            console.error("Geoapify Request Timed Out");
+            return JSON.parse(JSON.stringify({ success: false, error: "TIMEOUT" }));
+        }
+        console.error("Reverse Geocoding Error:", error?.message || error);
         return JSON.parse(JSON.stringify({ success: false, error: "FETCH_FAILED" }));
     }
 }

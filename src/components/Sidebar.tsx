@@ -28,7 +28,7 @@ export default function Sidebar() {
                 <img src="/logo1.png" alt="MCD Logo" className="w-10 h-10 object-contain" />
                 <div className="flex flex-col">
                     <span className="text-sm font-black text-mcd-navy leading-tight uppercase tracking-tight">MCD CivicOS</span>
-                    <span className="text-[10px] text-mcd-slate font-bold uppercase tracking-widest">Govt. of NCT Delhi</span>
+                    <span className="text-[10px] text-mcd-slate font-bold uppercase tracking-widest">Govt. of India</span>
                 </div>
             </div>
 
@@ -58,7 +58,7 @@ export default function Sidebar() {
                     </div>
                     <div className="flex flex-col">
                         <span className="text-xs font-bold text-mcd-navy">S. K. Verma</span>
-                        <span className="text-[10px] text-mcd-slate">Zonal Commissioner</span>
+                        <span className="text-[10px] text-mcd-slate">National Commissioner</span>
                     </div>
                 </div>
             </div>

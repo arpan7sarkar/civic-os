@@ -24,10 +24,12 @@ import {
     X
 } from "lucide-react";
 import Link from "next/link";
-import { getGrievancesAction } from "@/app/actions/grievance";
-import { getServerProfileAction, updateUserProfileAction } from "@/app/actions/profile";
+import { getAllGrievancesAction } from "@/app/actions/grievance";
+import { getServerProfileAction, updateUserProfileAction, UserProfile } from "@/app/actions/profile";
 import { logoutAction } from "@/app/actions/auth";
 import { useRouter } from "next/navigation";
+import { syncGrievances, getComplaints, getStats, generateDemoData } from "@/lib/store";
+import { reverseGeocodeAction } from "@/app/actions/geo";
 
 // Dynamic import for Leaflet map to avoid SSR errors
 const MapComponent = dynamic(() => import("@/components/MapComponent"), { 
@@ -46,13 +48,16 @@ export default function MapPage() {
     const router = useRouter();
     const [grievances, setGrievances] = useState<any[]>([]);
     const [filteredGrievances, setFilteredGrievances] = useState<any[]>([]);
-    const [userProfile, setUserProfile] = useState<any>(null);
+    const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
     const [searchTerm, setSearchTerm] = useState("");
     const [isLoading, setIsLoading] = useState(true);
+    const [activeZone, setActiveZone] = useState("All India");
+    const [currentAddress, setCurrentAddress] = useState<string | null>(null);
 
     const [showProfileMenu, setShowProfileMenu] = useState(false);
     const [showNotifications, setShowNotifications] = useState(false);
+    const [showZoneMenu, setShowZoneMenu] = useState(false);
     const [showMyProfileModal, setShowMyProfileModal] = useState(false);
     const [showUpdateProfileModal, setShowUpdateProfileModal] = useState(false);
     const [profileFormData, setProfileFormData] = useState({
@@ -63,8 +68,30 @@ export default function MapPage() {
     const [showMobileFilters, setShowMobileFilters] = useState(false);
     
     // Filters
-    const [selectedCategories, setSelectedCategories] = useState<string[]>(['Streetlight', 'Garbage', 'Water Leakage', 'Road Damage', 'Encroachment']);
+    const [selectedCategories, setSelectedCategories] = useState<string[]>(['Streetlight', 'Garbage', 'Water Leakage', 'Road Damage', 'Encroachment', 'Other']);
     const [selectedStatuses, setSelectedStatuses] = useState<string[]>(['Pending', 'In Progress', 'Resolved']);
+
+    const handleLocationTrack = () => {
+        if ("geolocation" in navigator) {
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+                const { latitude, longitude } = pos.coords;
+                setUserLocation([latitude, longitude]);
+                
+                try {
+                    const res = await reverseGeocodeAction(latitude, longitude);
+                    if (res.success && res.address) {
+                        setCurrentAddress(res.address);
+                    }
+                } catch (err) {
+                    console.warn("Address lookup failed:", err);
+                }
+            }, (err) => console.warn("Location tracking failed:", err));
+        }
+    };
+
+    useEffect(() => {
+        handleLocationTrack();
+    }, []);
 
     useEffect(() => {
         const init = async () => {
@@ -72,7 +99,7 @@ export default function MapPage() {
                 const profileRes = await getServerProfileAction();
                 let finalProfile = profileRes.profile;
 
-                // Client-side recovery fallback for robustness
+                // Client-side recovery fallback
                 if (profileRes.success && (!finalProfile || finalProfile.name.includes('Bridge'))) {
                     try {
                         const { account: browserAccount, databases: browserDatabases, DATABASE_ID, PROFILES_COLLECTION_ID } = await import('@/lib/appwrite');
@@ -86,20 +113,54 @@ export default function MapPage() {
                 }
 
                 if (finalProfile) {
-                    setUserProfile(finalProfile);
+                    setUserProfile(finalProfile as UserProfile);
+                    // Tier 1: Load Global Local Data Instantly
+                    const cachedData = getComplaints();
+                    const normalized = cachedData.map(g => {
+                        let category = g.category;
+                        if ((category as any) === 'Garbage Collection') category = 'Garbage' as any;
+                        if ((category as any) === 'Street Light') category = 'Streetlight' as any;
+                        if ((category as any) === 'Road Repair') category = 'Road Damage' as any;
+                        return { ...g, category };
+                    });
+                    if (normalized.length > 0) {
+                        setGrievances(normalized);
+                        setFilteredGrievances(normalized);
+                        setIsLoading(false);
+                    }
                 } else {
                     router.push('/auth');
                     return;
                 }
 
-                const grievancesRes = await getGrievancesAction();
-                if (grievancesRes.success && grievancesRes.grievances) {
-                    setGrievances(grievancesRes.grievances);
-                    setFilteredGrievances(grievancesRes.grievances);
-                }
+                // Tier 2: Background Sync (Parallel)
+                const fetchAndSync = async () => {
+                    try {
+                        const grievancesRes = await getAllGrievancesAction();
+                        if (grievancesRes.success && grievancesRes.grievances) {
+                            syncGrievances(grievancesRes.grievances, (finalProfile as UserProfile).userId);
+                            
+                            // Normalize data after sync to fix mismatches
+                            const rawData = getComplaints();
+                            const normalized = rawData.map(g => {
+                                let category = g.category;
+                                if ((category as any) === 'Garbage Collection') category = 'Garbage' as any;
+                                if ((category as any) === 'Street Light') category = 'Streetlight' as any;
+                                if ((category as any) === 'Road Repair') category = 'Road Damage' as any;
+                                return { ...g, category };
+                            });
+                            setGrievances(normalized);
+                        } else if (getComplaints().length === 0) {
+                            generateDemoData();
+                            setGrievances(getComplaints());
+                        }
+                    } catch (e) { console.warn("Global Background Sync failed:", e); }
+                    finally { setIsLoading(false); }
+                };
+                
+                fetchAndSync();
             } catch (err) {
                 console.error("Map Init Error:", err);
-            } finally {
                 setIsLoading(false);
             }
         };
@@ -155,11 +216,44 @@ export default function MapPage() {
         );
     };
 
-    const toggleStatus = (status: string) => {
+    const toggleStatus = (stat: string) => {
         setSelectedStatuses(prev => 
-            prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status]
+            prev.includes(stat) ? prev.filter(c => c !== stat) : [...prev, stat]
         );
     };
+
+    const handleTrackTicket = (ticketId: string) => {
+        // Logically redirect to dashboard with search context or deep link
+        router.push(`/dashboard?ticketId=${ticketId}`);
+    };
+
+    const handleExportData = () => {
+        if (filteredGrievances.length === 0) return;
+        
+        // Logical CSV export of current filtered view
+        const headers = ["Ticket ID", "Category", "Status", "Ward", "Description", "Latitude", "Longitude", "Created At"];
+        const rows = filteredGrievances.map(g => [
+            g.id,
+            g.category,
+            g.status,
+            g.ward,
+            `"${g.description.replace(/"/g, '""')}"`,
+            g.lat,
+            g.lng,
+            g.createdAt
+        ]);
+
+        const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `civicos_export_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
 
     return (
         <div className="flex flex-col h-screen overflow-hidden bg-white">
@@ -228,50 +322,85 @@ export default function MapPage() {
                             )}
                         </div>
                         
-                        <div className="relative">
+                        <div className="relative group">
                             <div 
-                                onClick={() => setShowProfileMenu(!showProfileMenu)}
-                                className="h-9 w-9 md:h-10 md:w-10 rounded-xl bg-slate-200 border border-slate-300 overflow-hidden cursor-pointer hover:ring-4 hover:ring-gov-blue/10 transition-all active:scale-95 shadow-md flex items-center justify-center p-0"
+                                onClick={() => setShowZoneMenu(!showZoneMenu)}
+                                className="flex items-center gap-2 text-slate-500 hover:text-gov-blue cursor-pointer transition-colors px-3 py-2 rounded-xl border border-transparent hover:border-slate-100"
                             >
-                                {userProfile?.profileImageUrl ? (
-                                    <img src={userProfile.profileImageUrl} alt="Profile" className="w-full h-full object-cover" />
-                                ) : (
-                                    <span className="text-gov-blue font-black uppercase text-[10px] md:text-xs">{userProfile?.name?.charAt(0) || 'C'}</span>
-                                )}
-                            </div>
-
-                            {showProfileMenu && (
-                                <div className="absolute top-full right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 animate-in fade-in slide-in-from-top-2">
-                                    <div className="px-4 py-2 border-b border-slate-50 lg:hidden">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Navigation</p>
-                                        <Link href="/dashboard" className="block py-1 text-xs font-bold text-slate-600 hover:text-gov-blue">Dashboard</Link>
-                                        <Link href="/report" className="block py-1 text-xs font-bold text-slate-600 hover:text-gov-blue">File Report</Link>
+                                <div className="flex flex-col items-start">
+                                    <div className="flex items-center gap-1">
+                                        <span className="text-[10px] font-black text-slate-800 uppercase tracking-widest whitespace-nowrap">{activeZone}</span>
+                                        <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${showZoneMenu ? 'rotate-180' : ''}`} />
                                     </div>
-                                    <button 
-                                        onClick={() => { setShowMyProfileModal(true); setShowProfileMenu(false); }}
-                                        className="w-full text-left px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors flex items-center gap-2"
-                                    >
-                                        <User className="w-3 h-3" /> My Profile
-                                    </button>
-                                    <button 
-                                        onClick={() => {
-                                            setProfileFormData({ email: userProfile?.email || "", address: userProfile?.address || "" });
-                                            setShowUpdateProfileModal(true);
-                                            setShowProfileMenu(false);
-                                        }}
-                                        className="w-full text-left px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors flex items-center gap-2"
-                                    >
-                                        <Settings className="w-3 h-3" /> Update Profile
-                                    </button>
-                                    <div className="h-px bg-slate-50 my-1" />
-                                    <button 
-                                        onClick={handleLogout}
-                                        className="w-full text-left px-4 py-2 text-xs font-bold text-red-500 hover:bg-red-50 transition-colors flex items-center gap-2"
-                                    >
-                                        <XCircle className="w-3 h-3" /> Logout
-                                    </button>
+                                    {currentAddress && <span className="text-[8px] font-bold text-slate-400 truncate max-w-[80px] sm:max-w-[100px]">{currentAddress}</span>}
+                                </div>
+                            </div>
+                            
+                            {showZoneMenu && (
+                                <div className="absolute top-full left-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 animate-in fade-in slide-in-from-top-2">
+                                    {["All India", "North Zone", "South Zone", "East Zone", "West Zone", "Central Zone"].map((zone) => (
+                                        <button
+                                            key={zone}
+                                            onClick={() => {
+                                                setActiveZone(zone);
+                                                setShowZoneMenu(false);
+                                                handleLocationTrack();
+                                            }}
+                                            className="w-full text-left px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 hover:text-gov-blue transition-colors"
+                                        >
+                                            {zone}
+                                        </button>
+                                    ))}
                                 </div>
                             )}
+                        </div>
+                        
+                        <div className="relative flex items-center gap-3 pl-4 border-l border-slate-200">
+                            <div className="text-right hidden sm:block">
+                                <p className="text-sm font-black text-slate-800 leading-none">{userProfile?.name || "Citizen"}</p>
+                                <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-widest leading-none">Resident • {activeZone}</p>
+                            </div>
+                            <div className="relative">
+                                <div 
+                                    onClick={() => setShowProfileMenu(!showProfileMenu)}
+                                    className="w-10 h-10 rounded-xl overflow-hidden shadow-md cursor-pointer hover:ring-4 hover:ring-gov-blue/10 transition-all active:scale-95"
+                                >
+                                    {userProfile?.profileImageUrl ? (
+                                        <img src={userProfile.profileImageUrl} alt="Avatar" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="w-full h-full bg-slate-200 flex items-center justify-center text-slate-400">
+                                            <User className="w-6 h-6" />
+                                        </div>
+                                    )}
+                                </div>
+                                {showProfileMenu && (
+                                    <div className="absolute top-full right-0 mt-2 w-48 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 animate-in fade-in slide-in-from-top-2">
+                                        <button 
+                                            onClick={() => { setShowMyProfileModal(true); setShowProfileMenu(false); }}
+                                            className="w-full text-left px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors flex items-center gap-2"
+                                        >
+                                            <User className="w-3 h-3" /> My Profile
+                                        </button>
+                                        <button 
+                                            onClick={() => {
+                                                setProfileFormData({ email: userProfile?.email || "", address: userProfile?.address || "" });
+                                                setShowUpdateProfileModal(true);
+                                                setShowProfileMenu(false);
+                                            }}
+                                            className="w-full text-left px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors flex items-center gap-2"
+                                        >
+                                            <Settings className="w-3 h-3" /> Update Profile
+                                        </button>
+                                        <div className="h-px bg-slate-50 my-1" />
+                                        <button 
+                                            onClick={handleLogout}
+                                            className="w-full text-left px-4 py-2 text-xs font-bold text-red-500 hover:bg-red-50 transition-colors flex items-center gap-2"
+                                        >
+                                            <XCircle className="w-3 h-3" /> Logout
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
             </header>
@@ -319,7 +448,7 @@ export default function MapPage() {
                                 <div className="space-y-4">
                                     <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Issue Categories</h3>
                                     <div className="grid grid-cols-1 gap-2">
-                                        {['Streetlight', 'Garbage', 'Water Leakage', 'Road Damage', 'Encroachment'].map(cat => (
+                                        {['Streetlight', 'Garbage', 'Water Leakage', 'Road Damage', 'Encroachment', 'Other'].map(cat => (
                                             <label key={cat} className="flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-50 cursor-pointer transition-all border border-transparent hover:border-slate-100 group">
                                                 <input 
                                                     type="checkbox" 
@@ -369,7 +498,10 @@ export default function MapPage() {
                                 Showing {filteredGrievances.length} active civic reports.
                             </p>
                         </div>
-                        <button className="w-full py-3 bg-gov-blue text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-800 transition-all shadow-lg shadow-blue-200 flex items-center justify-center gap-2">
+                        <button 
+                            onClick={handleExportData}
+                            className="w-full py-3 bg-gov-blue text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-800 transition-all shadow-lg shadow-blue-200 flex items-center justify-center gap-2"
+                        >
                             <Download className="w-4 h-4" />
                             Export Data
                         </button>
@@ -381,42 +513,53 @@ export default function MapPage() {
                     <MapComponent 
                         grievances={filteredGrievances} 
                         userLocation={userLocation} 
+                        onTrackTicket={handleTrackTicket}
                     />
 
-                    {/* Map Controls */}
-                    <div className="absolute top-4 right-4 md:top-6 md:right-6 flex flex-col gap-2 md:gap-3 z-20">
-                        <div className="flex flex-col rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
-                            <button className="p-3 md:p-4 hover:bg-slate-50 border-b border-slate-100 text-slate-600 transition-colors">
-                                <Plus className="w-4 md:w-5 h-4 md:h-5" />
-                            </button>
-                            <button className="p-3 md:p-4 hover:bg-slate-50 text-slate-600 transition-colors">
-                                <Minus className="w-4 md:w-5 h-4 md:h-5" />
-                            </button>
-                        </div>
+                    {/* Map Controls - Relocated to Bottom Right */}
+                    <div className="absolute bottom-6 right-6 md:bottom-28 md:right-8 flex flex-col gap-3 z-[1000]">
                         <button 
                             onClick={handleMyLocation}
-                            className="p-3 md:p-4 bg-white rounded-2xl shadow-2xl border border-slate-200 hover:bg-slate-50 text-gov-blue transition-all active:scale-95"
+                            className="p-4 bg-white rounded-2xl shadow-2xl border border-slate-200 hover:bg-slate-50 text-gov-blue transition-all active:scale-95 group flex items-center justify-center"
                         >
-                            <Navigation className="w-4 md:w-5 h-4 md:h-5" />
+                            <Navigation className="w-5 h-5 group-hover:rotate-12 transition-transform" />
                         </button>
+                        <div className="flex flex-col rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
+                            <button className="p-4 hover:bg-slate-50 border-b border-slate-100 text-slate-600 transition-colors">
+                                <Plus className="w-5 h-5" />
+                            </button>
+                            <button className="p-4 hover:bg-slate-50 text-slate-600 transition-colors">
+                                <Minus className="w-5 h-5" />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Coordinates Indicator - Relocated for visual balance */}
+                    <div className="absolute bottom-6 left-6 z-20">
+                        <div className="bg-slate-900/80 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10 shadow-2xl">
+                             <p className="text-[10px] font-black text-white uppercase tracking-widest flex items-center gap-2">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                {userLocation ? `${userLocation[0].toFixed(3)}° N, ${userLocation[1].toFixed(3)}° E` : 'LOCATING...'}
+                             </p>
+                        </div>
                     </div>
 
                     {/* Map Legend */}
-                    <div className="absolute bottom-6 right-6 md:bottom-8 md:right-8 z-20 hidden xs:block">
-                        <div className="bg-white/90 backdrop-blur-md p-4 md:p-5 rounded-3xl shadow-2xl border border-white w-44 md:w-52 overflow-hidden relative">
+                    <div className="absolute top-6 right-6 z-20 hidden lg:block">
+                        <div className="bg-white/90 backdrop-blur-md p-5 rounded-3xl shadow-2xl border border-white w-52 overflow-hidden relative">
                             <div className="absolute top-0 left-0 w-full h-1 bg-gov-blue"></div>
-                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 md:mb-4">Legend</h4>
-                            <div className="space-y-3 md:space-y-4">
+                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Live Status Legend</h4>
+                            <div className="space-y-4">
                                 {[
-                                    { label: 'Pending', desc: 'New', color: 'text-red-500' },
-                                    { label: 'In Progress', desc: 'Active', color: 'text-amber-500' },
-                                    { label: 'Resolved', desc: 'Done', color: 'text-emerald-500' }
+                                    { label: 'Pending', desc: 'Awaiting Action', color: 'text-red-500' },
+                                    { label: 'In Progress', desc: 'Work Underway', color: 'text-amber-500' },
+                                    { label: 'Resolved', desc: 'Issue Fixed', color: 'text-emerald-500' }
                                 ].map(item => (
-                                    <div key={item.label} className="flex items-center gap-2 md:gap-3">
-                                        <MapPin className={`w-4 h-4 md:w-5 md:h-5 ${item.color} fill-current`} />
+                                    <div key={item.label} className="flex items-center gap-3">
+                                        <MapPin className={`w-5 h-5 ${item.color} fill-current`} />
                                         <div className="flex flex-col">
-                                            <span className="text-[10px] md:text-xs font-black text-slate-700">{item.label}</span>
-                                            <span className="text-[8px] md:text-[9px] font-bold text-slate-400 uppercase tracking-tighter">{item.desc}</span>
+                                            <span className="text-xs font-black text-slate-700">{item.label}</span>
+                                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">{item.desc}</span>
                                         </div>
                                     </div>
                                 ))}

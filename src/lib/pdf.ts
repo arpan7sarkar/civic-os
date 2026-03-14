@@ -23,7 +23,7 @@ export const generateGrievancePDF = async (complaint: Complaint) => {
     
     pdf.setFontSize(10);
     pdf.setFont("helvetica", "normal");
-    pdf.text("Municipal Corporation of Delhi", 20, 28);
+    pdf.text("CivicOS National Portal", 20, 28);
     pdf.text("Digital Public Infrastructure", 20, 33);
 
     // Body

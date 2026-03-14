@@ -58,8 +58,8 @@ export default function Header() {
                         />
                         <div className="hidden sm:block border-l border-slate-300 h-8 mx-2"></div>
                         <Link href="/" className="flex flex-col leading-none">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Govt. of NCT Delhi</span>
-                            <h1 className="text-gov-blue text-xl font-extrabold tracking-tight">MCD CivicOS</h1>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Govt. of India</span>
+                            <h1 className="text-gov-blue text-xl font-extrabold tracking-tight">CivicOS National</h1>
                         </Link>
                     </div>
                 </div>

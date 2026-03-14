@@ -16,6 +16,7 @@ import {
     Mic,
     Square
 } from "lucide-react";
+import { useRef } from "react";
 import Link from "next/link";
 import { analyzeIssueAction, transcribeAudioAction } from "@/app/actions/ai";
 import { reverseGeocodeAction } from "@/app/actions/geo";
@@ -36,6 +37,7 @@ export default function ReportPage() {
         priority: Priority;
         department: string;
         suggestedAction: string;
+        refinedDescription: string;
     } | null>(null);
 
     const [location, setLocation] = useState("");
@@ -43,11 +45,12 @@ export default function ReportPage() {
     const [isDetecting, setIsDetecting] = useState(false);
     const [ticketId, setTicketId] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submitError, setSubmitError] = useState("");
 
     // Photo State
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [imagePreview, setImagePreview] = useState<string | null>(null);
-    const fileInputRef = useState<any>(null); // We'll use a hidden input
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Voice State
     const [isRecording, setIsRecording] = useState(false);
@@ -201,7 +204,8 @@ export default function ReportPage() {
             // 2. Save to Appwrite
             const appwriteRes = await createGrievanceAction({
                 id: newTicketId,
-                description,
+                description: aiResult.refinedDescription, // Use sanitized English version
+                rawDescription: description, // Optionally store raw input for audit
                 category: aiResult.category,
                 priority: aiResult.priority,
                 department: aiResult.department,
@@ -209,15 +213,22 @@ export default function ReportPage() {
                 lng: coords.lng || 77.1025,
                 status: 'Pending',
                 assignedTo: 'Processing',
-                ward: location.split(',')[0] || 'Delhi Zone',
+                ward: location.split(',')[0] || 'National Zone',
                 userId,
                 citizenPhoto: photoId
             });
 
+            if (!appwriteRes.success) {
+                console.error("Appwrite Submission Failed:", appwriteRes.error);
+                setSubmitError(`Database Sync Failed: ${appwriteRes.error}. Please check your Appwrite collection attributes.`);
+                setIsSubmitting(false);
+                return;
+            }
+
             // 3. Fallback/Sync to local storage for existing dashboard components
             await saveComplaint({
                 id: newTicketId,
-                description,
+                description: aiResult.refinedDescription, // Use sanitized English version
                 category: aiResult.category,
                 priority: aiResult.priority,
                 department: aiResult.department,
@@ -226,7 +237,7 @@ export default function ReportPage() {
                 status: 'Pending',
                 assignedTo: 'Processing',
                 createdAt: new Date().toISOString(),
-                ward: location.split(',')[0] || 'Delhi Zone',
+                ward: location.split(',')[0] || 'National Zone',
                 userId,
                 citizenPhoto: photoId
             });
@@ -245,7 +256,7 @@ export default function ReportPage() {
         
         await generateGrievancePDF({
             id: ticketId,
-            description,
+            description: aiResult.refinedDescription,
             category: aiResult.category,
             priority: aiResult.priority,
             department: aiResult.department,
@@ -269,7 +280,7 @@ export default function ReportPage() {
                     </Link>
                     <div>
                         <h1 className="text-sm font-black text-slate-800 uppercase tracking-widest">Report a Grievance</h1>
-                        <p className="text-[10px] text-slate-400 font-bold mt-0.5 uppercase tracking-wider hidden xs:block">Digital Public Infrastructure for Delhi</p>
+                        <p className="text-[10px] text-slate-400 font-bold mt-0.5 uppercase tracking-wider hidden xs:block">Digital Public Infrastructure for India</p>
                     </div>
                 </div>
                 <img src="/logo1.png" alt="MCD Logo" className="w-8 h-8 object-contain" />
@@ -338,21 +349,33 @@ export default function ReportPage() {
 
                 {step === 2 && aiResult && (
                     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        {submitError && (
+                            <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-700 text-xs font-bold animate-in shake-1">
+                                <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                                {submitError}
+                            </div>
+                        )}
                         <div className="mb-8">
                             <h2 className="text-2xl font-black text-slate-800 mb-2">2. Location & Evidence</h2>
                             <p className="text-sm text-slate-500">Help us locate the issue precisely for rapid resolution.</p>
                         </div>
 
                         {/* AI Detection Preview */}
-                        <div className="bg-gov-blue/5 border border-gov-blue/10 rounded-3xl p-6 mb-8 flex items-center gap-4">
-                            <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-gov-blue shadow-sm">
-                                <Sparkles className="w-6 h-6" />
-                            </div>
-                            <div>
-                                <div className="text-[10px] font-black text-gov-blue uppercase tracking-widest mb-1">AI Classification</div>
-                                <div className="text-sm font-bold text-slate-800">
-                                    Categorized as <span className="text-gov-blue">{aiResult.category}</span> • Priority: <span className="text-red-500">{aiResult.priority}</span>
+                        <div className="bg-gov-blue/5 border border-gov-blue/10 rounded-3xl p-6 mb-8">
+                            <div className="flex items-center gap-4 mb-4">
+                                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-gov-blue shadow-sm">
+                                    <Sparkles className="w-6 h-6" />
                                 </div>
+                                <div>
+                                    <div className="text-[10px] font-black text-gov-blue uppercase tracking-widest mb-1">AI Classification & Translation</div>
+                                    <div className="text-sm font-bold text-slate-800">
+                                        Categorized as <span className="text-gov-blue">{aiResult.category}</span> • Priority: <span className="text-red-500">{aiResult.priority}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="bg-white/50 p-4 rounded-2xl border border-gov-blue/5">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">English Refinement</p>
+                                <p className="text-xs font-bold text-slate-600 leading-relaxed italic">"{aiResult.refinedDescription}"</p>
                             </div>
                         </div>
 

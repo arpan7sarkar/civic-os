@@ -40,44 +40,97 @@ export async function createGrievanceAction(data: Partial<Complaint>) {
         const sessionSecret = cookieStore.getAll().find(c => c.name.startsWith('a_session_'))?.value;
         if (!sessionSecret) return { success: false, error: 'NO_SESSION' };
 
-        const { databases } = createAppwriteClient(sessionSecret);
+        const { databases, account: serverAccount } = createAppwriteClient(sessionSecret);
+        
+        // Get user details to ensure userId is correctly set in document
+        const user = await serverAccount.get();
+        const userId = user.$id;
+        const documentId = data.id || ID.unique();
 
         const result = await databases.createDocument(
             DATABASE_ID,
             GRIEVANCES_COLLECTION_ID,
-            ID.unique(),
+            documentId,
             {
                 ...data,
+                userId: userId, // Force current user ID
+                status: data.status || 'Pending', // Default status
                 createdAt: new Date().toISOString()
             }
         );
 
         return { success: true, complaint: result };
     } catch (error: any) {
-        console.error("Grievance Creation Error:", error);
+        console.error("Grievance Creation Error Details:", {
+            message: error.message,
+            code: error.code,
+            response: error.response
+        });
+        return { success: false, error: error.message || "DATABASE_ERROR" };
+    }
+}
+
+import { Query } from 'appwrite';
+
+/**
+ * Fetch all grievances for the map/dashboard
+ */
+export async function getGrievancesAction() {
+    try {
+        const cookieStore = await cookies();
+        let sessionSecret = cookieStore.getAll().find(c => c.name.startsWith('a_session_'))?.value;
+        
+        if (!sessionSecret) {
+            const { headers } = await import('next/headers');
+            const headerStore = await headers();
+            sessionSecret = headerStore.get('x-civic-session') || undefined;
+        }
+
+        if (!sessionSecret) return { success: false, error: 'NO_SESSION' };
+
+        const { databases, account: serverAccount } = createAppwriteClient(sessionSecret);
+        const user = await serverAccount.get();
+
+        const response = await databases.listDocuments(
+            DATABASE_ID,
+            GRIEVANCES_COLLECTION_ID,
+            [Query.equal('userId', user.$id), Query.orderDesc('createdAt')]
+        );
+
+        return { success: true, grievances: response.documents };
+    } catch (error: any) {
+        console.error("Fetch Grievances Error:", error);
         return { success: false, error: error.message };
     }
 }
 
 /**
- * Fetch all grievances for the map
+ * Fetch ALL grievances for the global map
  */
-export async function getGrievancesAction() {
+export async function getAllGrievancesAction() {
     try {
         const cookieStore = await cookies();
-        const sessionSecret = cookieStore.getAll().find(c => c.name.startsWith('a_session_'))?.value;
+        let sessionSecret = cookieStore.getAll().find(c => c.name.startsWith('a_session_'))?.value;
+        
+        if (!sessionSecret) {
+            const { headers } = await import('next/headers');
+            const headerStore = await headers();
+            sessionSecret = headerStore.get('x-civic-session') || undefined;
+        }
+
         if (!sessionSecret) return { success: false, error: 'NO_SESSION' };
 
         const { databases } = createAppwriteClient(sessionSecret);
 
         const response = await databases.listDocuments(
             DATABASE_ID,
-            GRIEVANCES_COLLECTION_ID
+            GRIEVANCES_COLLECTION_ID,
+            [Query.orderDesc('createdAt'), Query.limit(100)]
         );
 
         return { success: true, grievances: response.documents };
     } catch (error: any) {
-        console.error("Fetch Grievances Error:", error);
+        console.error("Fetch All Grievances Error:", error);
         return { success: false, error: error.message };
     }
 }

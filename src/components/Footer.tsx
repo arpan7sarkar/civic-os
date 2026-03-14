@@ -13,10 +13,10 @@ export default function Footer() {
                                 className="h-10 brightness-0 invert" 
                                 src="/logo1.png" 
                             />
-                            <span className="text-xl font-extrabold tracking-tight">MCD CivicOS</span>
+                            <span className="text-xl font-extrabold tracking-tight">CivicOS National</span>
                         </div>
                         <p className="text-slate-300 max-w-sm mb-6 mx-auto md:mx-0">
-                            The unified platform for Municipal Corporation of Delhi services. Committed to transparency, accountability, and citizen empowerment.
+                            The unified platform for National civic services. Committed to transparency, accountability, and citizen empowerment.
                         </p>
                         <div className="flex justify-center md:justify-start gap-4">
                             <Link href="#" className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-all">
@@ -53,7 +53,7 @@ export default function Footer() {
                 </div>
 
                 <div className="mt-12 pt-8 border-t border-white/10 flex flex-col md:flex-row justify-between items-center gap-4 text-slate-400 text-[10px] md:text-sm">
-                    <p>© 2026 Municipal Corporation of Delhi. All rights reserved.</p>
+                    <p>© 2026 CivicOS National Infrastructure. All rights reserved.</p>
                     <div className="flex gap-6">
                         <Link href="#" className="hover:text-white">Privacy Policy</Link>
                         <Link href="#" className="hover:text-white">Terms of Service</Link>

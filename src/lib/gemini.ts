@@ -32,20 +32,34 @@ export async function analyzeIssue(description: string) {
         console.log(`[GEMINI] Attempting analysis with ${modelName}`);
         const model = genAI.getGenerativeModel({ model: modelName });
         const prompt = `
-        Analyze the following civic issue reported by a citizen in Delhi. 
-        Note: The report may be in Hindi or other native languages; please translate/analyze accordingly but provide the JSON fields in English.
+        Analyze the following civic issue reported by a citizen in India. 
+        Note: The report may be in Hindi, Bengali, or other native languages.
         
         Issue: "${description}"
         
+        Tasks:
+        1. Translate the input to English if it is in another language.
+        2. Clean and Refine the description: Remove conversational filler, garbage values, greetings, and irrelevant chatter. 
+        3. Rewrite it into a professional, concise, and clear English sentence suitable for a formal civic report.
+
         Provide a JSON response with:
-        - category: string (one of: Water Leakage, Garbage Collection, Street Light, Road Repair, Drainage, Other)
+        - category: string (one of: Streetlight, Garbage, Water Leakage, Road Damage, Encroachment, Illegal Parking, Other)
         - priority: string (one of: Critical, High, Medium, Low)
         - department: string (appropriate MCD department)
         - suggestedAction: string (short recommendation for back-office)
+        - refinedDescription: string (The English, cleaned, and professional version of the issue)
         `;
 
-        const result = await model.generateContent(prompt);
-        // Fixing 'await' has no effect warning - result.response is sync on awaited result
+        const generateWithTimeout = async () => {
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error("Gemini Request Timed Out")), 15000);
+            });
+
+            const contentPromise = model.generateContent(prompt);
+            return Promise.race([contentPromise, timeoutPromise]) as Promise<any>;
+        };
+
+        const result = await generateWithTimeout();
         const response = result.response; 
         const text = response.text();
         const jsonStr = text.replace(/```json|```/g, "").trim();
