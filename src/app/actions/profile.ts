@@ -73,15 +73,10 @@ export async function getServerProfileAction() {
             return { success: true, profile: profile as unknown as UserProfile };
         }
 
-        // If no DB profile exists, fallback to account info
+        // If no DB profile exists, return null so caller can redirect to register
         return { 
             success: true, 
-            profile: { 
-                userId: user.$id, 
-                name: user.name || 'Citizen', 
-                govIdType: 'N/A', 
-                govIdNumber: 'N/A' 
-            } as UserProfile 
+            profile: null 
         };
     } catch (error: any) {
         console.error("[PROFILE_SERVER_V5] Error:", error.message);

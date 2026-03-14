@@ -71,6 +71,14 @@ export default function LoginPage() {
 
         setIsLoading(true);
         try {
+            // Check if a session already exists to avoid "session active" error
+            try {
+                await account.deleteSession('current');
+                console.log('[LOGIN] Existing session cleared');
+            } catch (e) {
+                // No active session, ignore
+            }
+
             // 2. Verify OTP and Create Session ON CLIENT directly in Browser
             const session = await account.updatePhoneSession(userId, otpValue);
             
@@ -79,8 +87,14 @@ export default function LoginPage() {
             
             if (session && handoffResult.success) {
                 setSuccess('Authenticated successfully! Redirecting...');
-                // Use window.location.href for full reload to ensure Proxy sees new cookie immediately
-                window.location.href = '/dashboard';
+                
+                // Check if profile exists; if not, redirect to /auth/register
+                const userResult = await getCurrentUserAction();
+                if (userResult.success && !userResult.user?.name) {
+                    window.location.href = '/auth/register';
+                } else {
+                    window.location.href = '/dashboard';
+                }
             } else {
                 setError(handoffResult.error || 'Session created but layout verification failed.');
             }

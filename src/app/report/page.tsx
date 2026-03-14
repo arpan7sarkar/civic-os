@@ -57,8 +57,15 @@ export default function ReportPage() {
 
     useEffect(() => {
         getServerProfileAction().then(result => {
-            if (result.success && result.profile) setUserId(result.profile.userId);
-            else router.replace('/auth');
+            if (result.success && result.profile) {
+                setUserId(result.profile.userId);
+            } else if (result.success && !result.profile) {
+                // Authenticated but no profile - go to registration
+                router.replace('/auth/register');
+            } else {
+                // No session - go to login
+                router.replace('/auth');
+            }
         });
     }, [router]);
 

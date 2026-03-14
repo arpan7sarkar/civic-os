@@ -201,12 +201,8 @@ export default function CitizenDashboard() {
                         if (dbResult.documents.length > 0) {
                             finalProfile = JSON.parse(JSON.stringify(dbResult.documents[0])) as UserProfile;
                         } else {
-                            finalProfile = {
-                                userId: browserUser.$id,
-                                name: browserUser.name || 'Citizen',
-                                govIdType: 'N/A',
-                                govIdNumber: 'N/A'
-                            };
+                            // No profile in DB, let the main flow redirect to /auth/register
+                            finalProfile = null;
                         }
                     } catch (e: any) {
                         console.warn("[DASHBOARD_CLIENT] Client-Side Recovery failed:", e.message);
@@ -368,16 +364,16 @@ export default function CitizenDashboard() {
             {/* Main Content */}
             <main className="flex-1 lg:ml-64 p-4 md:p-8">
                 {/* Header Section */}
-                <header className="flex items-center gap-4 mb-8 bg-white/50 backdrop-blur-md p-4 rounded-3xl border border-white/50 shadow-sm sticky top-4 z-10">
+                <header className="flex items-center gap-3 md:gap-4 mb-6 md:mb-8 bg-white/50 backdrop-blur-md p-3 md:p-4 rounded-2xl md:rounded-3xl border border-white/50 shadow-sm sticky top-4 z-10">
                     <button 
                         onClick={() => setShowMobileSidebar(true)}
                         className="p-2 hover:bg-slate-100 rounded-xl text-slate-600 lg:hidden"
                     >
-                        <Menu className="w-6 h-6" />
+                        <Menu className="w-5 h-5 md:w-6 md:h-6" />
                     </button>
 
-                    <div className="flex items-center gap-4 flex-1 overflow-hidden">
-                        <div className="relative flex-1 hidden sm:block">
+                    <div className="flex items-center gap-2 md:gap-4 flex-1 overflow-hidden">
+                        <div className="relative flex-1 hidden md:block">
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                             <input 
                                 type="text" 
@@ -599,8 +595,8 @@ export default function CitizenDashboard() {
                             </div>
                         </div>
 
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left">
+                        <div className="overflow-x-auto -mx-4 md:mx-0">
+                            <table className="w-full text-left min-w-[700px]">
                                 <thead>
                                     <tr className="border-b border-slate-50">
                                         <th className="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Ticket ID</th>

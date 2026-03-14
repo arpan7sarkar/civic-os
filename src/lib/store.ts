@@ -30,11 +30,14 @@ export function getComplaints(userId?: string): Complaint[] {
     const stored = localStorage.getItem(STORAGE_KEY);
     let complaints: Complaint[] = stored ? JSON.parse(stored) : [];
     
-    // Auto-Migrate tickets from the fallback Bridge Account to the REAL user account
-    if (userId && userId !== '69b3113c0002f41bb917' && userId !== 'demo-user') {
+    // Normalize anonymous IDs for migration
+    const ANONYMOUS_IDS = ['anonymous', '69b3113c0002f41bb917'];
+
+    // Auto-Migrate tickets from anonymous/bridge to the REAL user account
+    if (userId && userId !== 'demo-user' && !ANONYMOUS_IDS.includes(userId)) {
         let needsMigration = false;
         complaints = complaints.map(c => {
-            if (c.userId === '69b3113c0002f41bb917') {
+            if (ANONYMOUS_IDS.includes(c.userId)) {
                 needsMigration = true;
                 return { ...c, userId: userId };
             }
@@ -42,13 +45,13 @@ export function getComplaints(userId?: string): Complaint[] {
         });
         
         if (needsMigration) {
-            console.log(`[STORE] Auto-migrated Bridge tickets to real Appwrite UID: ${userId}`);
+            console.log(`[STORE] Auto-migrated tickets to real UID: ${userId}`);
             localStorage.setItem(STORAGE_KEY, JSON.stringify(complaints));
         }
     }
 
     if (userId) {
-        return complaints.filter(c => c.userId === userId);
+        return complaints.filter(c => c.userId === userId || c.userId === 'demo-user');
     }
     return complaints;
 }
@@ -70,7 +73,9 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 }
 
 export function saveComplaint(complaint: Complaint) {
-    const complaints = getComplaints();
+    if (typeof window === 'undefined') return;
+    const stored = localStorage.getItem(STORAGE_KEY);
+    const complaints: Complaint[] = stored ? JSON.parse(stored) : [];
     complaints.unshift(complaint);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(complaints));
 }

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, Sparkles, Loader2, CheckCircle2 } from "lucide-react";
 import { analyzeIssueAction } from "@/app/actions/ai";
+import { getCurrentUserAction } from "@/app/actions/auth";
 import { saveComplaint } from "@/lib/store";
 import { AnalysisResult, Complaint } from "@/lib/types";
 
@@ -11,6 +12,17 @@ export default function Hero() {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [result, setResult] = useState<AnalysisResult | null>(null);
     const [ticketId, setTicketId] = useState<string | null>(null);
+    const [currentUserId, setCurrentUserId] = useState<string>('anonymous');
+
+    useEffect(() => {
+        const checkUser = async () => {
+            const { success, user } = await getCurrentUserAction();
+            if (success && user) {
+                setCurrentUserId(user.$id);
+            }
+        };
+        checkUser();
+    }, []);
 
     const handleAnalyze = async () => {
         if (!description.trim()) return;
@@ -38,7 +50,7 @@ export default function Hero() {
                 assignedTo: 'Officer Unassigned',
                 createdAt: new Date().toISOString(),
                 ward: 'Ward 104 (Lajpat Nagar)',
-                userId: 'anonymous' // Default until logged in
+                userId: currentUserId
             };
 
             saveComplaint(newComplaint);
