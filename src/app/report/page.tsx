@@ -13,7 +13,6 @@ import {
     ArrowRight,
     AlertCircle,
     FileText,
-    ShieldCheck,
     Mic,
     Square
 } from "lucide-react";
@@ -273,9 +272,7 @@ export default function ReportPage() {
                         <p className="text-[10px] text-slate-400 font-bold mt-0.5 uppercase tracking-wider hidden xs:block">Digital Public Infrastructure for Delhi</p>
                     </div>
                 </div>
-                <div className="w-8 h-8 bg-gov-blue rounded-lg flex items-center justify-center">
-                    <ShieldCheck className="w-5 h-5 text-white" />
-                </div>
+                <img src="/logo1.png" alt="MCD Logo" className="w-8 h-8 object-contain" />
             </header>
 
             <main className="pt-24 pb-12 px-6 max-w-2xl mx-auto">

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { User, Search, PlayCircle, ShieldCheck, LayoutGrid, LogOut } from "lucide-react";
+import { User, Search, PlayCircle, LayoutGrid, LogOut } from "lucide-react";
 import { generateDemoData } from "@/lib/store";
 import { getCurrentUserAction, logoutAction } from "@/app/actions/auth";
 import { useRouter } from "next/navigation";
@@ -58,7 +58,7 @@ export default function Header() {
                         />
                         <div className="hidden sm:block border-l border-slate-300 h-8 mx-2"></div>
                         <Link href="/" className="flex flex-col leading-none">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Govt. of Delhi</span>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Govt. of NCT Delhi</span>
                             <h1 className="text-gov-blue text-xl font-extrabold tracking-tight">MCD CivicOS</h1>
                         </Link>
                     </div>

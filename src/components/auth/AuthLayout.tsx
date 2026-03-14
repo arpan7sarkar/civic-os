@@ -1,6 +1,6 @@
 "use client";
 
-import { ShieldCheck, ChevronLeft } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 
 interface AuthLayoutProps {

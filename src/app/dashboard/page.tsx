@@ -334,9 +334,7 @@ export default function CitizenDashboard() {
             <aside className={`w-64 bg-white border-r border-slate-100 flex flex-col fixed inset-y-0 z-50 transition-transform duration-300 lg:translate-x-0 ${showMobileSidebar ? 'translate-x-0' : '-translate-x-full'} lg:z-20`}>
                 <div className="p-6 flex items-center justify-between border-b border-slate-50">
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-gov-blue rounded-lg flex items-center justify-center shadow-lg shadow-gov-blue/20">
-                            <ShieldAlert className="w-5 h-5 text-white" />
-                        </div>
+                        <img src="/logo1.png" alt="MCD Logo" className="w-10 h-10 object-contain" />
                         <div>
                             <h1 className="text-sm font-black text-slate-800 leading-none">MCD CivicOS</h1>
                             <p className="text-[10px] text-slate-400 font-bold mt-1">Govt. of NCT Delhi</p>

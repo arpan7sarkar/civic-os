@@ -9,9 +9,9 @@ export default function Footer() {
                     <div className="md:col-span-2">
                         <div className="flex items-center justify-center md:justify-start gap-3 mb-6">
                             <img 
-                                alt="Delhi Logo White" 
-                                className="h-8 brightness-0 invert" 
-                                src="https://lh3.googleusercontent.com/aida-public/AB6AXuCmy5Ef_ppiuApwYTUOPSSzx2qSSqyDIRCya4ZgsLXtA-Pzc6s1wx2wI3nqNaOB33AaKmR03aan-VxcZvqyXD1voY_CLjO4tBHLwc94Ui8Rbk2AMg7T7zFCCCYVR2NPzzvsuCoplmhcwnKjDVRIvmAzwojmceNy3NGqC4To5HBDvhoY8ZNQ423V_OnSqDvDXV7OHiMWKbuh5oZq9yERe7iBVgdzhSl4qLtRHfQ55iRMi3oqsY9QCn_Ce718MiDSkTvHqW7ornJLTg" 
+                                alt="MCD CivicOS Logo" 
+                                className="h-10 brightness-0 invert" 
+                                src="/logo1.png" 
                             />
                             <span className="text-xl font-extrabold tracking-tight">MCD CivicOS</span>
                         </div>

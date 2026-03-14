@@ -27,8 +27,8 @@ export default function Sidebar() {
             <div className="flex items-center gap-3 px-6 py-8 border-b border-gray-100">
                 <img src="/logo1.png" alt="MCD Logo" className="w-10 h-10 object-contain" />
                 <div className="flex flex-col">
-                    <span className="text-sm font-bold text-mcd-navy leading-tight uppercase tracking-tight">MCD</span>
-                    <span className="text-[10px] text-mcd-slate font-medium uppercase tracking-widest">Command Center</span>
+                    <span className="text-sm font-black text-mcd-navy leading-tight uppercase tracking-tight">MCD CivicOS</span>
+                    <span className="text-[10px] text-mcd-slate font-bold uppercase tracking-widest">Govt. of NCT Delhi</span>
                 </div>
             </div>
 

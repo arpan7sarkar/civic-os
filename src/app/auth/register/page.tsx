@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getCurrentUserAction } from '@/app/actions/auth';
 import { createProfileWithImageAction } from '@/app/actions/profile';
-import { ShieldCheck, User, IdCard, Camera, ChevronRight, Loader2, AlertCircle, Plus } from 'lucide-react';
+import { User, IdCard, Camera, ChevronRight, Loader2, AlertCircle, Plus } from 'lucide-react';
 
 export default function RegisterProfilePage() {
     const router = useRouter();
@@ -89,9 +89,7 @@ export default function RegisterProfilePage() {
         <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
             <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-100 p-8 md:p-12 animate-in fade-in slide-in-from-bottom-4">
                 <div className="text-center mb-10">
-                    <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center text-primary mx-auto mb-4">
-                        <ShieldCheck className="w-10 h-10" />
-                    </div>
+                    <img src="/logo1.png" alt="MCD Logo" className="w-16 h-16 object-contain mx-auto mb-4" />
                     <h1 className="text-2xl font-black text-slate-900">Complete Your Profile</h1>
                     <p className="text-slate-500 text-sm font-medium mt-2">Secure digital identity established via OTP. Please provide required details.</p>
                 </div>

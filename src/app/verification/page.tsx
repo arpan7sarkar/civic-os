@@ -250,12 +250,12 @@ export default function VerificationPage() {
                 <VerificationContent />
             </Suspense>
 
-            <footer className="mt-12 bg-white border-t border-gray-100 p-8 flex flex-col md:flex-row justify-between items-center gap-6 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+            <footer className="mt-12 bg-white border-t border-gray-100 p-8 flex flex-col md:flex-row justify-between items-center gap-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">
                 <div className="flex items-center gap-2">
                     <CheckSquare className="w-4 h-4 text-green-500" /> Compliant with GIGW & WCAG 2.1 standards
                 </div>
                 <div>
-                    © 2026 MUNICIPAL CORPORATION OF DELHI | CIVICOS V2.4.0
+                    © 2026 MCD CIVICOS | GOVT. OF NCT DELHI
                 </div>
                 <div className="flex gap-6">
                     <a href="#" className="hover:text-mcd-navy transition-colors">Help Desk</a>
