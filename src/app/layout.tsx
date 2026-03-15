@@ -22,7 +22,6 @@ export const metadata: Metadata = {
 };
 
 import { Analytics } from "@vercel/analytics/next";
-import ComplianceBanner from "@/components/ComplianceBanner";
 
 export default function RootLayout({
   children,
@@ -37,7 +36,6 @@ export default function RootLayout({
           rel="stylesheet"
         />
         <link rel="icon" href="/logo1.png" sizes="any" />
-        <ComplianceBanner />
         {children}
         <Analytics />
       </body>
