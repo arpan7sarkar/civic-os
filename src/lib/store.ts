@@ -49,18 +49,16 @@ export function syncGrievances(cloudGrievances: any[], userId: string) {
         assignedTo: doc.assignedTo,
         createdAt: doc.createdAt || doc.$createdAt,
         citizenPhoto: doc.citizenPhoto,
-        repairPhoto: doc.repairPhoto,
-        isSynced: true // Mark as synced
+        repairPhoto: doc.repairPhoto
     } as Complaint));
 
     // Merge: Cloud data wins for existing IDs
-    const cloudIds = new Set(normalizedCloud.map(c => c.id));
     const merged = [...normalizedCloud];
     
-    // Add local-only ones (ones not in cloudIds)
+    // Add local-only ones (like demo data or unsynced ones)
     localGrievances.forEach(local => {
-        if (!cloudIds.has(local.id)) {
-            merged.push({ ...local, isSynced: false });
+        if (!normalizedCloud.find(c => c.id === local.id)) {
+            merged.push(local);
         }
     });
 
@@ -73,11 +71,14 @@ export function getComplaints(userId?: string): Complaint[] {
     const stored = localStorage.getItem(STORAGE_KEY);
     let complaints: Complaint[] = stored ? JSON.parse(stored) : [];
     
-    // Auto-Migrate tickets from ANY ID to the REAL user account if we have one
-    if (userId && userId !== 'demo-user') {
+    // Normalize anonymous IDs for migration
+    const ANONYMOUS_IDS = ['anonymous'];
+
+    // Auto-Migrate tickets from anonymous/bridge to the REAL user account
+    if (userId && userId !== 'demo-user' && !ANONYMOUS_IDS.includes(userId)) {
         let needsMigration = false;
         complaints = complaints.map(c => {
-            if (c.userId !== userId && c.userId !== 'demo-user') {
+            if (ANONYMOUS_IDS.includes(c.userId)) {
                 needsMigration = true;
                 return { ...c, userId: userId };
             }
@@ -85,7 +86,7 @@ export function getComplaints(userId?: string): Complaint[] {
         });
         
         if (needsMigration) {
-            console.log(`[STORE] Auto-migrated local tickets to current UID: ${userId}`);
+            console.log(`[STORE] Auto-migrated tickets to real UID: ${userId}`);
             localStorage.setItem(STORAGE_KEY, JSON.stringify(complaints));
         }
     }

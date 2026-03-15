@@ -180,15 +180,12 @@ export default function CitizenDashboard() {
         const localComplaints = getComplaints(uid);
         
         // Immediate UI feedback with local data
-        const initialFiltered = localComplaints.filter(c => {
-            const term = searchTerm.toLowerCase();
-            return (
-                (c.id?.toLowerCase() || "").includes(term) || 
-                (c.ward?.toLowerCase() || "").includes(term) ||
-                (c.category?.toLowerCase() || "").includes(term) ||
-                (c.description?.toLowerCase() || "").includes(term)
-            );
-        });
+        const initialFiltered = localComplaints.filter(c => 
+            c.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
+            c.ward.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            c.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            c.description.toLowerCase().includes(searchTerm.toLowerCase())
+        );
         setComplaints(initialFiltered);
         setStats(getStats(uid));
 
@@ -200,26 +197,20 @@ export default function CitizenDashboard() {
 
         if (unsynced.length > 0) {
             console.log(`[DASHBOARD_CLIENT] Pushing ${unsynced.length} unsynced grievances...`);
-            // Run sync sequentially with small delay to prevent rate limits
-            const syncAll = async () => {
-                for (const g of unsynced) {
-                    try {
-                        const res = await createGrievanceAction(g);
-                        if (res.success) console.log(`[DASHBOARD_CLIENT] Synced: ${g.id}`);
-                        // Wait 100ms between to be safe
-                        await new Promise(r => setTimeout(r, 100));
-                    } catch (err) { console.error(`[DASHBOARD_CLIENT] Sync error for ${g.id}:`, err); }
-                }
-                
+            // Run sync in parallel (non-blocking)
+            Promise.all(unsynced.map(async (g) => {
+                try {
+                    const res = await createGrievanceAction(g);
+                    if (res.success) console.log(`[DASHBOARD_CLIENT] Synced: ${g.id}`);
+                } catch (err) { console.error(`[DASHBOARD_CLIENT] Sync error for ${g.id}:`, err); }
+            })).then(async () => {
                 // Final re-fetch to ensure local store is perfectly synced with cloud IDs/states
                 const finalRes = await getGrievancesAction();
                 if (finalRes.success && finalRes.grievances) {
                     syncGrievances(finalRes.grievances, uid);
                     setComplaints(getComplaints(uid));
-                    setStats(getStats(uid));
                 }
-            };
-            syncAll();
+            });
         }
     };
 
@@ -682,23 +673,10 @@ export default function CitizenDashboard() {
                                     </button>
                                 </Link>
                                 <button 
-                                    onClick={async () => {
-                                        if (userProfile) {
-                                            setIsRefreshing(true);
-                                            await loadData(userProfile.userId);
-                                            setIsRefreshing(false);
-                                        }
-                                    }}
-                                    className="px-4 py-2.5 bg-gov-blue text-white rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-blue-600 transition-all shadow-md shadow-blue-100 active:scale-95"
-                                >
-                                    <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} /> 
-                                    <span>Sync Cloud Digits</span>
-                                </button>
-                                <button 
                                     onClick={refreshFeed}
-                                    className="px-4 py-2.5 bg-slate-50 text-slate-400 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-slate-100 transition-colors"
+                                    className="px-4 py-2.5 bg-slate-50 text-gov-blue rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-gov-blue/5 transition-colors"
                                 >
-                                    <Search className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Refresh</span>
+                                    <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} /> <span className="hidden sm:inline">Refresh</span>
                                 </button>
                             </div>
                         </div>

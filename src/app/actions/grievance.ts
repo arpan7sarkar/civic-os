@@ -48,62 +48,25 @@ export async function createGrievanceAction(data: Partial<Complaint>) {
         const { id, ...attributes } = data;
         const documentId = id || ID.unique();
 
-        // STRICT PAYLOAD: Ensure we only send what Appwrite expects and force correct ownership
-        const payload = {
-            category: attributes.category || 'Other',
-            description: attributes.description || '',
-            priority: attributes.priority || 'Medium',
-            department: attributes.department || 'General',
-            ward: attributes.ward || 'General',
-            lat: attributes.lat || 0,
-            lng: attributes.lng || 0,
-            status: 'Pending', // Force all new grievances to Pending
-            userId: userId,    // Force absolute ownership
-            createdAt: attributes.createdAt || new Date().toISOString(),
-            citizenPhoto: attributes.citizenPhoto || '',
-            repairPhoto: attributes.repairPhoto || ''
-        };
-
-        try {
-            const result = await databases.createDocument(
-                DATABASE_ID,
-                GRIEVANCES_COLLECTION_ID,
-                documentId,
-                payload
-            );
-            return { success: true, complaint: result };
-        } catch (error: any) {
-            // FALLBACK: If full payload fails, try MINIMAL payload (only fields likely to exist)
-            if (error.code === 400 || error.message?.includes('attribute')) {
-                console.warn("[GRIEVANCE_SYNC] Full payload failed. Attempting MINIMAL payload...");
-                const minimalPayload = {
-                    userId: payload.userId,
-                    description: payload.description,
-                    category: payload.category,
-                    priority: payload.priority,
-                    ward: payload.ward,
-                    department: payload.department,
-                    lat: payload.lat,
-                    lng: payload.lng,
-                    status: payload.status,
-                    createdAt: payload.createdAt
-                };
-                try {
-                    const result = await databases.createDocument(
-                        DATABASE_ID,
-                        GRIEVANCES_COLLECTION_ID,
-                        documentId,
-                        minimalPayload
-                    );
-                    return { success: true, complaint: result, warning: 'MINIMAL_SYNC_PERFORMED' };
-                } catch (innerError: any) {
-                    throw innerError;
-                }
+        const result = await databases.createDocument(
+            DATABASE_ID,
+            GRIEVANCES_COLLECTION_ID,
+            documentId,
+            {
+                ...attributes,
+                userId: userId, // Force current logged-in user ID
+                status: attributes.status || 'Pending', // Default status
+                createdAt: attributes.createdAt || new Date().toISOString()
             }
-            throw error;
-        }
+        );
+
+        return { success: true, complaint: result };
     } catch (error: any) {
-        console.error("Grievance Creation Error:", error.message);
+        console.error("Grievance Creation Error Details:", {
+            message: error.message,
+            code: error.code,
+            response: error.response
+        });
         return { success: false, error: error.message || "DATABASE_ERROR" };
     }
 }

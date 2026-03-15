@@ -188,13 +188,11 @@ export default function MapPage() {
 
                         if (unsynced.length > 0) {
                             console.log(`[MAP_SYNC] Found ${unsynced.length} unsynced. Pushing...`);
-                            const syncMapAll = async () => {
-                                for (const g of unsynced) {
-                                    try {
-                                        await createGrievanceAction(g);
-                                        await new Promise(r => setTimeout(r, 100)); // Rate limit safety
-                                    } catch (err) { console.error("Sync failed for", g.id, err); }
-                                }
+                            Promise.all(unsynced.map(async (g) => {
+                                try {
+                                    await createGrievanceAction(g);
+                                } catch (err) { console.error("Sync failed for", g.id, err); }
+                            })).then(async () => {
                                 const refreshRes = await getAllGrievancesAction();
                                 if (refreshRes.success && refreshRes.grievances) {
                                     syncGrievances(refreshRes.grievances, (finalProfile as UserProfile).userId);
@@ -206,10 +204,8 @@ export default function MapPage() {
                                         return { ...g, category } as Complaint;
                                     });
                                     setGrievances(rawData);
-                                    setFilteredGrievances(rawData);
                                 }
-                            };
-                            syncMapAll();
+                            });
                         }
 
                         if (rawData.length === 0 && !grievancesRes.success) {
