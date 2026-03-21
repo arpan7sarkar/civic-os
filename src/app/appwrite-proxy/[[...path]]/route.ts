@@ -38,7 +38,8 @@ async function proxyRequest(request: NextRequest) {
     // console.log(`[PROXY] ${request.method} -> ${targetUrl}`);
 
     const headers = new Headers(request.headers);
-    headers.delete('host');
+    const targetHost = new URL(env.APPWRITE_ENDPOINT).host;
+    headers.set('host', targetHost);
     headers.delete('x-forwarded-for');
     headers.delete('x-forwarded-host');
     headers.delete('x-forwarded-proto');
@@ -61,6 +62,11 @@ async function proxyRequest(request: NextRequest) {
             cache: 'no-store'
         });
 
+        if (!response.ok) {
+            const errorBody = await response.clone().text();
+            console.error(`[PROXY_UPSTREAM_ERROR] ${response.status} ${response.statusText}: ${errorBody.slice(0, 100)}...`);
+        }
+
         const responseHeaders = new Headers(response.headers);
         
         // Rewrite Set-Cookie Path from /v1 to /
@@ -78,10 +84,13 @@ async function proxyRequest(request: NextRequest) {
                 normalized = normalized.replace(/Domain=[^;]+;?/, '');
                 
                 // 3. Normalize SameSite and Secure for development
+                // 3. Normalize SameSite and Secure for development vs production
                 if (process.env.NODE_ENV === 'development') {
                     normalized = normalized.replace(/Secure;?/, '');
                     normalized = normalized.replace(/SameSite=None;?/, 'SameSite=Lax');
                 } else {
+                    // In Production (cloud), WE MUST BE SECURE on HTTPS
+                    if (!normalized.includes('Secure')) normalized += '; Secure';
                     normalized = normalized.replace(/SameSite=None;?/, 'SameSite=Lax');
                 }
                 

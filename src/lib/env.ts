@@ -29,7 +29,7 @@ export const env = {
     // Appwrite Config (Client & Server)
     // NOTE: Next.js requires static property access (process.env.NAME) for NEXT_PUBLIC_ vars on client
     APPWRITE_ENDPOINT: (typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT : (process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || process.env.APPWRITE_ENDPOINT)) || 'https://sgp.cloud.appwrite.io/v1',
-    APPWRITE_PROJECT_ID: (typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID : (process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || process.env.APPWRITE_PROJECT_ID)) || '',
+    APPWRITE_PROJECT_ID: (typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID : (process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || process.env.APPWRITE_PROJECT_ID)) || '69b02bf0001038d5437c',
     
     // IDs (Client Access via NEXT_PUBLIC_ fallbacks)
     DATABASE_ID: (typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID : (process.env.NEXT_PUBLIC_APPWRITE_DATABASE_ID || process.env.APPWRITE_DATABASE_ID)) || 'user_profiles',

@@ -40,6 +40,7 @@ export async function checkRegistrationAction() {
         const sessionSecret = await getServerSession();
         
         if (!sessionSecret) {
+            console.error(`[AUTH_ACTION_DEBUG] NO_SESSION_SECRET found in checkRegistrationAction.`);
             return JSON.parse(JSON.stringify({ success: false, error: 'NO_SESSION' }));
         }
 
@@ -123,10 +124,11 @@ export async function getCurrentUserAction() {
             user: sanitizedUser 
         }));
     } catch (error: any) {
-        console.error("[AUTH_ACTION] Get Current User Error:", error?.message || error);
+        console.error(`[AUTH_ACTION] Get Current User Error [${error?.code || 'NO_CODE'}]:`, error?.message || error);
         return JSON.parse(JSON.stringify({ 
             success: false, 
-            error: error?.message || String(error) 
+            error: error?.message || String(error),
+            code: error?.code
         }));
     }
 }
