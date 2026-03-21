@@ -107,7 +107,13 @@ function VerificationContent() {
                         <div className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-gray-100">
                             <div className="absolute inset-0 bg-gradient-to-br from-orange-900/10 to-transparent"></div>
                             {complaint.citizenPhoto ? (
-                                <img src={complaint.citizenPhoto} alt="Report" className="w-full h-full object-cover" />
+                                <Image 
+                                    src={complaint.citizenPhoto} 
+                                    alt="Citizen Report" 
+                                    fill
+                                    className="object-cover" 
+                                    sizes="(max-width: 1024px) 100vw, 500px"
+                                />
                             ) : (
                                 <div className="absolute inset-0 flex items-center justify-center">
                                     <span className="text-gray-400 text-xs font-bold uppercase tracking-widest text-center px-4">AI ANALYZED PHOTO<br />(Visual Evidence)</span>
@@ -159,7 +165,13 @@ function VerificationContent() {
                         <div className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-gray-100 border-4 border-green-50">
                             <div className="absolute inset-0 bg-gradient-to-br from-green-900/10 to-transparent"></div>
                             {complaint.repairPhoto ? (
-                                <img src={complaint.repairPhoto} alt="Repair" className="w-full h-full object-cover" />
+                                <Image 
+                                    src={complaint.repairPhoto} 
+                                    alt="Official Repair Log" 
+                                    fill
+                                    className="object-cover" 
+                                    sizes="(max-width: 1024px) 100vw, 500px"
+                                />
                             ) : (
                                 <div className="absolute inset-0 flex items-center justify-center">
                                     <span className="text-gray-400 text-xs font-bold uppercase tracking-widest text-center px-4">OFFICIAL REPAIR LOG<br />PHOTO RECORD</span>

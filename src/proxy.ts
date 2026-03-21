@@ -14,9 +14,10 @@ export function proxy(request: NextRequest) {
     // 2. Parsed Cookies
     const officialSession = request.cookies.getAll().find(c => c.name.startsWith('a_session_'));
     const bridgeSession = request.cookies.get('civic_auth_verified');
+    const customSession = request.cookies.get('civic_session_secret');
 
     // Recovery Logic for Forwarding
-    let recoveredSecret = officialSession?.value;
+    let recoveredSecret = officialSession?.value || customSession?.value;
     if (!recoveredSecret && rawCookieHeader.includes('a_session_')) {
         const match = rawCookieHeader.match(/a_session_[^=;]+=([^;]+)/);
         if (match) {
@@ -25,7 +26,7 @@ export function proxy(request: NextRequest) {
         }
     }
 
-    const hasSession = !!recoveredSecret || !!bridgeSession?.value;
+    const hasSession = !!recoveredSecret || !!bridgeSession?.value || !!customSession?.value;
 
     if (pathname.startsWith('/dashboard') || pathname.startsWith('/auth')) {
         console.log(`[PROXY_STABILITY] ${pathname} | HasSession: ${hasSession} | BridgeUID: ${bridgeSession?.value || 'NONE'}`);

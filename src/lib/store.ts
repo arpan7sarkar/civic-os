@@ -92,9 +92,12 @@ export function getComplaints(userId?: string): Complaint[] {
     }
 
     if (userId) {
-        return complaints.filter(c => c.userId === userId || c.userId === 'demo-user');
+        // Return only the current user's complaints. 
+        // Demo data is strictly isolated to the 'demo-user' session.
+        return complaints.filter(c => c.userId === userId);
     }
-    return complaints;
+    // For non-authenticated views (landing page), return all (or specific subset)
+    return complaints.filter(c => c.userId !== 'demo-user');
 }
 
 // Helper for spatial distance check (Haversine formula)

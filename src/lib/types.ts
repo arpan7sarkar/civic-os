@@ -27,7 +27,6 @@ export interface Complaint {
     citizenPhoto?: string;
     repairPhoto?: string;
     rawDescription?: string;
-    isSynced?: boolean;
 }
 
 export interface AnalysisResult {

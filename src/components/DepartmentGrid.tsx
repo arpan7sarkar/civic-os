@@ -43,10 +43,14 @@ export default function DepartmentGrid() {
                 <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
                     <div>
                         <h2 className="text-gov-blue text-3xl font-bold tracking-tight">Direct Citizen Services</h2>
-                        <p className="text-slate-500 mt-2">Access specialized municipal services for your neighborhood</p>
+                        <p className="text-slate-600 mt-2">Access specialized municipal services for your neighborhood</p>
                     </div>
-                    <Link href="#" className="text-primary font-bold flex items-center gap-2 hover:underline">
-                        View All Services <ArrowRight className="w-4 h-4" />
+                    <Link 
+                        href="#" 
+                        aria-label="View all municipal services"
+                        className="text-primary font-bold flex items-center gap-2 hover:underline"
+                    >
+                        View All Services <ArrowRight className="w-4 h-4" aria-hidden="true" />
                     </Link>
                 </div>
 
@@ -57,17 +61,18 @@ export default function DepartmentGrid() {
                             className="group bg-white p-8 rounded-lg border border-slate-200 hover:border-primary/50 hover:shadow-xl transition-all"
                         >
                             <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center text-primary mb-6">
-                                <service.icon className="w-6 h-6" />
+                                <service.icon className="w-6 h-6" aria-hidden="true" />
                             </div>
                             <h3 className="text-gov-blue text-xl font-bold mb-3">{service.name}</h3>
-                            <p className="text-slate-500 text-sm leading-relaxed mb-6">
+                            <p className="text-slate-600 text-sm leading-relaxed mb-6">
                                 {service.description}
                             </p>
                             <button
                                 onClick={() => handleReportRedirect(service.name)}
-                                className="text-primary font-bold inline-flex items-center gap-2 group-hover:gap-3 transition-all"
+                                aria-label={`Report a civic issue related to ${service.name}`}
+                                className="text-primary font-bold inline-flex items-center gap-2 transition-colors group/btn"
                             >
-                                Report Now <ArrowRight className="w-4 h-4" />
+                                Report Now <ArrowRight className="w-4 h-4 transition-transform group-hover/btn:translate-x-1" aria-hidden="true" />
                             </button>
                         </div>
                     ))}

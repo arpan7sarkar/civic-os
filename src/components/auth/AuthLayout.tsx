@@ -1,5 +1,6 @@
 "use client";
 
+import Image from 'next/image';
 import { ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 
@@ -14,11 +15,18 @@ export default function AuthLayout({ children, title, subtitle }: AuthLayoutProp
         <div className="min-h-screen bg-slate-50 flex flex-col">
             <header className="px-4 md:px-8 py-4 md:py-6 flex justify-between items-center bg-white border-b border-slate-100">
                 <div className="flex items-center gap-3">
-                    <img src="/logo1.png" alt="CivicOS Logo" className="w-10 h-10 object-contain" />
+                    <Image 
+                        src="/logo1.png" 
+                        alt="CivicOS Logo" 
+                        width={40} 
+                        height={40} 
+                        priority
+                        className="object-contain" 
+                    />
                     <span className="text-lg md:text-xl font-black text-slate-800 tracking-tight">CivicOS</span>
                 </div>
                 <div className="flex items-center gap-6">
-                    <Link href="/" className="text-xs font-black text-slate-400 uppercase tracking-widest hover:text-gov-blue transition-colors flex items-center gap-2">
+                    <Link href="/" className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-gov-blue transition-colors flex items-center gap-2">
                         <ChevronLeft className="w-4 h-4" />
                         <span className="hidden sm:inline">Back to Home</span>
                     </Link>
@@ -40,8 +48,8 @@ export default function AuthLayout({ children, title, subtitle }: AuthLayoutProp
             </main>
 
             <footer className="py-10 flex flex-col items-center gap-6">
-                <p className="text-[9px] text-slate-400 font-medium opacity-60">
-                    © 2026 CivicOS - Municipal Corporation Digital Infrastructure. All rights reserved.
+                <p className="text-[9px] text-slate-300 font-bold uppercase tracking-widest">
+                    Digital India Infrastructure — Powered by CivicOS
                 </p>
             </footer>
         </div>

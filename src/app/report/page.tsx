@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { 
     ChevronLeft, 
@@ -283,7 +284,15 @@ export default function ReportPage() {
                         <p className="text-[10px] text-slate-400 font-bold mt-0.5 uppercase tracking-wider hidden xs:block">Digital Public Infrastructure for India</p>
                     </div>
                 </div>
-                <img src="/logo1.png" alt="MCD Logo" className="w-8 h-8 object-contain" />
+                <div className="relative w-8 h-8">
+                    <Image 
+                        src="/logo1.png" 
+                        alt="MCD Logo" 
+                        fill
+                        className="object-contain" 
+                        sizes="32px"
+                    />
+                </div>
             </header>
 
             <main className="pt-24 pb-12 px-6 max-w-2xl mx-auto">
@@ -415,8 +424,14 @@ export default function ReportPage() {
                                 >
                                     {imagePreview ? (
                                         <div className="relative w-full aspect-video rounded-2xl overflow-hidden border border-slate-100">
-                                            <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
-                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-black uppercase tracking-widest">
+                                            <Image 
+                                                src={imagePreview} 
+                                                alt="Preview" 
+                                                fill
+                                                className="object-cover" 
+                                                sizes="(max-width: 672px) 100vw, 672px"
+                                            />
+                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-black uppercase tracking-widest z-10">
                                                 Change Photo
                                             </div>
                                         </div>

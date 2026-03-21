@@ -1,7 +1,9 @@
 "use server";
 
+import { env } from "@/lib/env";
+
 export async function reverseGeocodeAction(lat: number, lon: number) {
-    const apiKey = process.env.GEOAPIFY_API_KEY;
+    const apiKey = env.GEOAPIFY_API_KEY;
     if (!apiKey) {
         console.error("GEOAPIFY_API_KEY is not set");
         return { success: false, error: "API_KEY_MISSING" };

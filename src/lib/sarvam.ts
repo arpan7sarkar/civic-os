@@ -1,6 +1,8 @@
+import 'server-only';
 import { SarvamAIClient } from "sarvamai";
 
-const SARVAM_API_KEY = process.env.SARVAM_API_KEY || "";
+import { env } from "./env";
+const SARVAM_API_KEY = env.SARVAM_API_KEY;
 
 const sarvamClient = SARVAM_API_KEY ? new SarvamAIClient({
     apiSubscriptionKey: SARVAM_API_KEY

@@ -3,8 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { getCurrentUserAction } from '@/app/actions/auth';
+import Image from 'next/image';
 import { createProfileWithImageAction, getServerProfileAction, updateUserProfileAction } from '@/app/actions/profile';
-import { User, IdCard, Camera, ChevronRight, Loader2, AlertCircle, Plus } from 'lucide-react';
+import { User, IdCard, Camera, ArrowRight, Loader2, AlertCircle, Plus } from 'lucide-react';
+import AuthLayout from '@/components/auth/AuthLayout';
 
 export default function RegisterProfilePage() {
     const router = useRouter();
@@ -102,64 +104,63 @@ export default function RegisterProfilePage() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-            <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl border border-slate-100 p-8 md:p-12 animate-in fade-in slide-in-from-bottom-4">
-                <div className="text-center mb-10">
-                    <img src="/logo1.png" alt="MCD Logo" className="w-16 h-16 object-contain mx-auto mb-4" />
-                    <h1 className="text-2xl font-black text-slate-900">Mandatory Profile Update</h1>
-                    <p className="text-slate-500 text-sm font-medium mt-2">Secure digital identity established via OTP. Please provide required details.</p>
-                </div>
-
+        <AuthLayout title="Civic Identity Profile" subtitle="Professional Service CRM Gateway">
+            <div className="space-y-8">
                 {error && (
-                    <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl flex items-center gap-3 text-red-700 text-sm">
+                    <div className="p-4 bg-red-50 border border-red-100 rounded-xl flex items-center gap-3 text-red-700 text-sm">
                         <AlertCircle className="w-5 h-5 flex-shrink-0" />
                         {error}
                     </div>
                 )}
 
-                <form onSubmit={handleSubmit} className="space-y-6">
-                    {/* Profile Picture */}
+                <form onSubmit={handleSubmit} className="space-y-10">
                     <div className="flex flex-col items-center">
                         <div className="relative group cursor-pointer" onClick={() => document.getElementById('profile-image')?.click()}>
-                            <div className="w-24 h-24 rounded-full bg-slate-100 border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden transition-all group-hover:border-primary">
+                            <div className="w-28 h-28 rounded-full bg-slate-50 border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden transition-all group-hover:border-gov-blue relative">
                                 {imagePreview ? (
-                                    <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                                    <Image 
+                                        src={imagePreview} 
+                                        alt="Profile Preview" 
+                                        fill
+                                        className="object-cover" 
+                                        sizes="112px"
+                                    />
                                 ) : (
-                                    <Camera className="w-8 h-8 text-slate-300 group-hover:text-primary" />
+                                    <Camera className="w-10 h-10 text-slate-300 group-hover:text-gov-blue" />
                                 )}
                             </div>
-                            <div className="absolute bottom-0 right-0 w-8 h-8 bg-white rounded-full shadow-md border border-slate-100 flex items-center justify-center text-slate-400 group-hover:text-primary">
-                                <Plus className="w-4 h-4" />
+                            <div className="absolute bottom-1 right-1 w-9 h-9 bg-white rounded-full shadow-lg border border-slate-100 flex items-center justify-center text-slate-400 group-hover:text-gov-blue">
+                                <Plus className="w-5 h-5" />
                             </div>
                         </div>
                         <input id="profile-image" type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
-                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-2">Upload Profile Photo (Optional)</label>
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-4">Profile Photo (Passport Style Recommended)</label>
                     </div>
 
-                    <div className="space-y-4">
-                        <div>
-                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 px-1">Full Name (As per Govt ID)</label>
+                    <div className="space-y-6">
+                        <div className="space-y-2">
+                            <label className="text-sm font-semibold text-slate-700">Full Name (As per Identity Document)</label>
                             <div className="relative group">
-                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-primary transition-colors">
+                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-gov-blue transition-colors">
                                     <User className="w-5 h-5" />
                                 </div>
                                 <input 
                                     type="text" 
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
-                                    placeholder="Enter your full name"
-                                    className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-800 placeholder:text-slate-300 focus:bg-white focus:border-primary outline-none transition-all"
+                                    placeholder="Full Name"
+                                    className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:bg-white focus:border-gov-blue outline-none transition-all placeholder:text-slate-300"
                                 />
                             </div>
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 px-1">ID Type</label>
+                            <div className="space-y-2">
+                                <label className="text-sm font-semibold text-slate-700">Credential Type</label>
                                 <select 
                                     value={govIdType}
                                     onChange={(e) => setGovIdType(e.target.value)}
-                                    className="w-full px-4 py-4 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-800 focus:bg-white focus:border-primary outline-none transition-all appearance-none"
+                                    className="w-full px-4 py-4 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:bg-white focus:border-gov-blue outline-none transition-all appearance-none"
                                 >
                                     <option>Aadhaar</option>
                                     <option>PAN Card</option>
@@ -167,39 +168,42 @@ export default function RegisterProfilePage() {
                                     <option>Driving License</option>
                                 </select>
                             </div>
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 px-1">ID Number</label>
+                            <div className="space-y-2">
+                                <label className="text-sm font-semibold text-slate-700">Document Number</label>
                                 <div className="relative group">
-                                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-primary transition-colors">
+                                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400 group-focus-within:text-gov-blue transition-colors">
                                         <IdCard className="w-5 h-5" />
                                     </div>
                                     <input 
                                         type="text" 
                                         value={govIdNumber}
                                         onChange={(e) => setGovIdNumber(e.target.value)}
-                                        placeholder="Enter ID number"
-                                        className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-100 rounded-xl font-bold text-slate-800 placeholder:text-slate-300 focus:bg-white focus:border-primary outline-none transition-all"
+                                        autoComplete="off"
+                                        placeholder="ID Number"
+                                        className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:bg-white focus:border-gov-blue outline-none transition-all placeholder:text-slate-300"
                                     />
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <p className="text-[10px] text-slate-400 text-center leading-relaxed">
-                        By completing this profile, you consent to the processing of your data in accordance with the Digital Personal Data Protection (DPDP) Act, 2023.
-                    </p>
+                    <div className="pt-4">
+                        <button 
+                            type="submit"
+                            disabled={isLoading}
+                            className="w-full py-5 bg-gov-blue hover:bg-gov-blue-dark text-white font-black rounded-2xl shadow-xl shadow-gov-blue/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                            {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Verify and Continue"}
+                            {!isLoading && <ArrowRight className="w-5 h-5" />}
+                        </button>
+                    </div>
 
-                    <button 
-                        type="submit"
-                        disabled={isLoading}
-                        className="w-full py-5 bg-primary text-white font-black rounded-2xl shadow-xl shadow-primary/20 hover:shadow-2xl hover:shadow-primary/30 hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                    >
-                        {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Verify and Continue"}
-                        {!isLoading && <ChevronRight className="w-5 h-5" />}
-                    </button>
+                    <p className="text-[10px] text-slate-400 text-center leading-relaxed font-bold uppercase tracking-tight">
+                        Secured Digital Identity Gateway — Digital Personal Data Protection (DPDP) Compliant
+                    </p>
                 </form>
             </div>
-        </div>
+        </AuthLayout>
     );
 }
 

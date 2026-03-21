@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState, useEffect } from "react";
 import { Search, Sparkles, Loader2, CheckCircle2 } from "lucide-react";
 import { analyzeIssueAction } from "@/app/actions/ai";
@@ -71,32 +72,42 @@ export default function Hero() {
     };
 
     return (
-        <section className="relative overflow-hidden bg-[#F8FAFC] py-20 lg:py-32">
-            {/* Soft Focus Infrastructure Background */}
-            <div 
-                className="absolute inset-0 opacity-10 pointer-events-none bg-cover bg-center" 
-                style={{ backgroundImage: "url('https://lh3.googleusercontent.com/aida-public/AB6AXuAd8OJNn3czIeTEWeXqfltC1a2ihcXeoFdbdPSN3vP1N7H9SYZUR8T9DQ4OXmcd3HPj3o8O_utVtE-DOBOJbrlzTn8GoskcKq52MbxW3vxE21lTx8TRX1O35hKl0bkrj1jZW9rFpGZtq4oLHcHqdA79KoYGyzq2Wz2rpdavBWtzub7j3pp0eJ6ePLENi41NAfq02zRcb_OEACiYhPQPrXMYcbHsDPDnW4xQNaRw3lO_vCJTbR6_LR11ZMBPpiQMggGRJv6rt_0b-w')" }}
-            />
+        <section className="relative overflow-hidden bg-[#F8FAFC] py-16 lg:py-32">
+            <div className="absolute inset-0 opacity-10 pointer-events-none">
+                <Image 
+                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuAd8OJNn3czIeTEWeXqfltC1a2ihcXeoFdbdPSN3vP1N7H9SYZUR8T9DQ4OXmcd3HPj3o8O_utVtE-DOBOJbrlzTn8GoskcKq52MbxW3vxE21lTx8TRX1O35hKl0bkrj1jZW9rFpGZtq4oLHcHqdA79KoYGyzq2Wz2rpdavBWtzub7j3pp0eJ6ePLENi41NAfq02zRcb_OEACiYhPQPrXMYcbHsDPDnW4xQNaRw3lO_vCJTbR6_LR11ZMBPpiQMggGRJv6rt_0b-w"
+                    alt="Govt Infrastructure Pattern"
+                    className="object-cover object-center"
+                    fill
+                    priority
+                    fetchPriority="high"
+                    sizes="100vw"
+                />
+            </div>
             
             <div className="container mx-auto px-4 md:px-10 lg:px-20 relative z-10">
-                <div className="text-center max-w-4xl mx-auto mb-16">
-                    <h1 className="text-slate-900 text-4xl md:text-6xl font-black leading-tight tracking-tight mb-6">
+                <div className="text-center max-w-4xl mx-auto mb-16 md:mb-24 relative">
+                    {/* Subtle Readability Gradient behind Headline */}
+                    <div className="absolute -inset-x-20 -top-10 bottom-0 bg-gradient-to-b from-white/90 via-white/50 to-transparent blur-3xl -z-10 pointer-events-none" />
+                    <h1 className="text-slate-900 text-3xl sm:text-5xl md:text-7xl font-[900] leading-[1.1] tracking-tight mb-8">
                         A Smarter, Cleaner India for Every Citizen
                     </h1>
-                    <p className="text-slate-600 text-lg md:text-xl font-normal leading-relaxed mb-10 max-w-2xl mx-auto">
+                    <p className="text-slate-600 text-[15px] sm:text-lg md:text-2xl font-medium leading-relaxed mb-12 max-w-2xl mx-auto px-6">
                         Report civic issues, track resolutions, and connect directly with government departments in real-time. Together, we build a better nation.
                     </p>
                     
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-5 px-8 sm:px-0">
                         <button 
                             onClick={() => router.push(currentUserId === 'anonymous' ? '/auth' : '/dashboard')}
-                            className="w-full sm:w-auto px-8 py-4 bg-primary text-white text-lg font-bold rounded-lg shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all"
+                            aria-label="Report a civic issue"
+                            className="w-full sm:w-auto px-10 py-4.5 bg-primary text-white text-base md:text-lg font-bold rounded-2xl shadow-xl shadow-primary/20 hover:shadow-2xl hover:brightness-105 hover:-translate-y-0.5 transition-all"
                         >
                             Report an Issue
                         </button>
                         <button 
                             onClick={() => router.push(currentUserId === 'anonymous' ? '/auth' : '/dashboard')}
-                            className="w-full sm:w-auto px-8 py-4 bg-transparent border-2 border-slate-300 text-slate-700 text-lg font-bold rounded-lg hover:bg-white transition-all"
+                            aria-label="Track existing complaint status"
+                            className="w-full sm:w-auto px-10 py-4.5 bg-white border-2 border-slate-100 text-slate-800 text-base md:text-lg font-bold rounded-2xl shadow-lg shadow-slate-200/50 hover:bg-slate-50 transition-all"
                         >
                             Track Complaint Status
                         </button>
@@ -109,11 +120,11 @@ export default function Hero() {
                     
                     <div className="p-8">
                         <div className="flex items-center gap-3 mb-6">
-                            <div className="w-10 h-10 flex items-center justify-center">
-                                <img src="/logo1.png" alt="MCD Logo" className="w-8 h-8 object-contain" />
+                            <div className="w-10 h-10 flex items-center justify-center relative">
+                                <Image src="/logo1.png" alt="MCD Logo" width={32} height={32} className="object-contain" />
                             </div>
                             <div>
-                                <h3 className="text-slate-900 font-bold leading-none">AI Quick-Report</h3>
+                                <h2 className="text-slate-900 font-bold leading-none">AI Quick-Report</h2>
                                 <p className="text-xs text-slate-500 mt-1">Resolution Optimized</p>
                             </div>
                         </div>
@@ -128,7 +139,10 @@ export default function Hero() {
                                         className="w-full min-h-[120px] p-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all resize-none text-slate-700"
                                     />
                                     <div className="absolute right-4 bottom-4 flex gap-2">
-                                        <button className="p-2 text-slate-400 hover:text-gov-blue transition-colors">
+                                        <button 
+                                            aria-label="Search civic reports"
+                                            className="p-2 text-slate-400 hover:text-gov-blue transition-colors"
+                                        >
                                             <Search className="w-5 h-5" />
                                         </button>
                                     </div>
@@ -136,20 +150,21 @@ export default function Hero() {
 
                                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mt-2">
                                     <div className="flex flex-wrap gap-2">
-                                        <span className="px-3 py-1 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase rounded-full">NLP Analysis</span>
-                                        <span className="px-3 py-1 bg-slate-100 text-slate-600 text-[10px] font-bold uppercase rounded-full">Priority Engine</span>
+                                        <span className="px-3 py-1 bg-green-50 text-green-700 text-[10px] font-bold uppercase tracking-wider rounded-full border border-green-100">✨ Auto-Categorized</span>
+                                        <span className="px-3 py-1 bg-blue-50 text-blue-700 text-[10px] font-bold uppercase tracking-wider rounded-full border border-blue-100">🚀 Fast-Tracked</span>
                                     </div>
                                     <button 
                                         onClick={handleAnalyze}
                                         disabled={isAnalyzing || !description.trim()}
-                                        className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-gov-blue text-white font-bold rounded-lg hover:brightness-110 shadow-md transition-all disabled:opacity-50 shrink-0"
+                                        aria-label={isAnalyzing ? "Analyzing your report" : "Submit report with AI analysis"}
+                                        className="w-full sm:w-auto flex items-center justify-center gap-2 px-8 py-3.5 bg-gov-blue-dark text-white font-bold rounded-xl hover:brightness-110 shadow-lg shadow-gov-blue/20 transition-[filter,box-shadow,transform] disabled:opacity-50 shrink-0"
                                     >
                                         {isAnalyzing ? (
-                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                            <Loader2 className="w-5 h-5 animate-spin" />
                                         ) : (
-                                            <Sparkles className="w-4 h-4 fill-current" />
+                                            <Sparkles className="w-5 h-5 fill-current" />
                                         )}
-                                        {isAnalyzing ? "Analyzing..." : "Analyze with AI"}
+                                        {isAnalyzing ? "Analyzing Request..." : "Smart Submit"}
                                     </button>
                                 </div>
                             </>

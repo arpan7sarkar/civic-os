@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { createPhoneTokenAction, setBridgeCookieAction, getCurrentUserAction } from '@/app/actions/auth';
+import { createPhoneTokenAction, checkRegistrationAction, syncSessionAction, getCurrentUserAction } from '@/app/actions/auth';
 import { account } from '@/lib/appwrite'; // Client-side singleton
 import AuthLayout from '@/components/auth/AuthLayout';
-import { RefreshCw, ChevronRight, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { RefreshCw, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { generateCaptcha, validateCaptcha } from '@/lib/captcha';
 
 export default function LoginPage() {
@@ -77,49 +77,45 @@ export default function LoginPage() {
         }
 
         setIsLoading(true);
-        console.log(`[LOGIN] Starting verification for UID: ${userId}`);
+        console.log(`[LOGIN_CLIENT] Starting verification for UID: ${userId}`);
         try {
-            // Check if a session already exists to avoid "session active" error
+            // Step 1: Ensure any old session is cleared (Prevents "session prohibited" errors)
             try {
-                await account.deleteSession('current');
-                console.log('[LOGIN] Existing session cleared');
+                await account.deleteSession({
+                    sessionId: 'current'
+                });
             } catch (e) {
-                // No active session, ignore
+                // Ignore
             }
 
-            // 2. Verify OTP and Create Session ON CLIENT directly in Browser
-            console.log('[LOGIN] Updating phone session...');
-            const session = await account.updatePhoneSession(userId, otpValue);
-            console.log('[LOGIN] Client session created:', !!session);
+            console.log('[LOGIN_CLIENT] Verifying OTP on client via Proxy...');
+            await account.createSession({
+                userId,
+                secret: otpValue
+            });
+
+            // STEP 2: Hand off to server for registration check
+            // The Server Action will now see the PROXY_BRIDGE cookie automatically
+            console.log('[LOGIN_CLIENT] Session established. Syncing with server...');
+            await new Promise(r => setTimeout(r, 800));
+            const result = await checkRegistrationAction();
             
-            // 3. Set fallback bridge cookie for layout
-            console.log('[LOGIN] Setting bridge cookie via server action...');
-            const handoffResult = await setBridgeCookieAction(userId);
-            console.log('[LOGIN] Handoff result:', handoffResult);
-            
-            if (session && handoffResult.success) {
+            if (result.success) {
                 setSuccess('Authenticated successfully! Redirecting...');
                 
-                // 4. Verify profile existence ON CLIENT directly
-                console.log('[LOGIN] Verifying profile existence on client...');
-                try {
-                    const user = await account.get();
-                    if (user && !user.name) {
-                        console.log('[LOGIN] No profile found, routing to register');
-                        window.location.href = '/auth/register';
-                    } else {
-                        console.log('[LOGIN] Profile found, routing to dashboard');
-                        window.location.href = '/dashboard';
-                    }
-                } catch (userErr) {
-                    console.error('[LOGIN] Static profile check failed, using fallback redirect to dashboard');
-                    window.location.href = '/dashboard';
+                // Use the isNewUser flag from the server for correct routing
+                if (result.isNewUser) {
+                    console.log('[LOGIN_CLIENT] New user detected, routing to register');
+                    router.push('/auth/register');
+                } else {
+                    console.log('[LOGIN_CLIENT] Profile verified, routing to dashboard');
+                    router.push('/dashboard');
                 }
             } else {
-                setError(handoffResult.error || 'Session created but layout verification failed.');
+                setError(result.error || 'Session created but server sync failed.');
             }
         } catch (err: any) {
-            console.error('[LOGIN] OTP Verification Error:', err);
+            console.error('[LOGIN_CLIENT] OTP Verification Error:', err);
             setError(err.message || 'Invalid OTP. Please try again.');
         } finally {
             setIsLoading(false);
@@ -127,7 +123,7 @@ export default function LoginPage() {
     };
 
     return (
-        <AuthLayout title="MCD CivicOS" subtitle="Citizen Login">
+        <AuthLayout title="Govt. of India" subtitle="CivicOS National — Citizen Login">
             {error && (
                 <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl flex items-center gap-3 text-red-700 text-sm animate-in shake-1">
                     <AlertCircle className="w-5 h-5 flex-shrink-0" />
@@ -192,7 +188,7 @@ export default function LoginPage() {
                         className="w-full py-5 bg-gov-blue text-white font-black rounded-2xl shadow-xl shadow-gov-blue/20 hover:shadow-2xl transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                     >
                         {isLoading ? <RefreshCw className="w-5 h-5 animate-spin" /> : "Verify Mobile & Continue"}
-                        {!isLoading && <ChevronRight className="w-5 h-5" />}
+                        {!isLoading && <ArrowRight className="w-5 h-5" />}
                     </button>
                     
                     <p className="text-center text-xs font-bold text-slate-400">
@@ -228,6 +224,7 @@ export default function LoginPage() {
                                         onKeyDown={(e) => {
                                             if (e.key === 'Backspace' && !otpArray[index] && index > 0) document.getElementById(`otp-${index - 1}`)?.focus();
                                         }}
+                                        autoComplete="one-time-code"
                                         className={`w-11 h-14 md:h-16 md:w-14 bg-slate-50 border-2 rounded-xl text-2xl font-black text-center transition-all outline-none flex items-center justify-center
                                             ${peekIndex === index || !digit ? 'text-gov-blue' : 'text-transparent'}
                                             ${digit ? 'border-gov-blue/20 bg-white shadow-sm' : 'border-slate-100'}

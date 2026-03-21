@@ -155,7 +155,7 @@ export default function CitizenDashboard() {
         try {
             const cloudRes = await getGrievancesAction();
             if (cloudRes.success && cloudRes.grievances) {
-                cloudGrievances = cloudRes.grievances.map(doc => ({
+                cloudGrievances = (cloudRes.grievances as any[]).map((doc: any) => ({
                     id: doc.$id || doc.id,
                     userId: doc.userId,
                     description: doc.description,
@@ -241,21 +241,21 @@ export default function CitizenDashboard() {
                 if (result.success && (!finalProfile || finalProfile.name.includes('Bridge'))) {
                     console.log("[DASHBOARD_CLIENT] Server missing deep session. Attempting Client-Side Recovery...");
                     try {
-                        const { account: browserAccount, databases: browserDatabases, DATABASE_ID, PROFILES_COLLECTION_ID } = await import('@/lib/appwrite');
+                        const { account: browserAccount, tablesDB: browserTables, DATABASE_ID, PROFILES_COLLECTION_ID } = await import('@/lib/appwrite');
                         const { Query } = await import('appwrite');
                         
                         const browserUser = await browserAccount.get();
                         console.log("[DASHBOARD_CLIENT] Client-Side Account Found:", browserUser.name);
                         
                         // Try to get real profile doc from DB via client-side
-                        const dbResult = await browserDatabases.listDocuments(
-                            DATABASE_ID,
-                            PROFILES_COLLECTION_ID,
-                            [Query.equal('userId', browserUser.$id)]
-                        );
+                        const dbResult = await browserTables.listRows({
+                            databaseId: DATABASE_ID,
+                            tableId: PROFILES_COLLECTION_ID,
+                            queries: [Query.equal('userId', browserUser.$id)]
+                        });
 
-                        if (dbResult.documents.length > 0) {
-                            finalProfile = JSON.parse(JSON.stringify(dbResult.documents[0])) as UserProfile;
+                        if (dbResult.rows.length > 0) {
+                            finalProfile = JSON.parse(JSON.stringify(dbResult.rows[0])) as UserProfile;
                         } else {
                             // No profile in DB, let the main flow redirect to /auth/register
                             finalProfile = null;
@@ -406,10 +406,18 @@ export default function CitizenDashboard() {
             <aside className={`w-64 bg-white border-r border-slate-100 flex flex-col fixed inset-y-0 z-50 transition-transform duration-300 lg:translate-x-0 ${showMobileSidebar ? 'translate-x-0' : '-translate-x-full'} lg:z-20`}>
                 <div className="p-6 flex items-center justify-between border-b border-slate-50">
                     <div className="flex items-center gap-3">
-                        <img src="/logo1.png" alt="MCD Logo" className="w-10 h-10 object-contain" />
+                        <div className="relative w-10 h-10">
+                            <Image 
+                                src="/logo1.png" 
+                                alt="MCD Logo" 
+                                fill
+                                className="object-contain" 
+                                sizes="40px"
+                            />
+                        </div>
                         <div>
-                            <h1 className="text-sm font-black text-slate-800 leading-none">MCD CivicOS</h1>
-                            <p className="text-[10px] text-slate-400 font-bold mt-1">Govt. of India</p>
+                            <h1 className="text-sm font-black text-slate-800 leading-none">Govt. of India</h1>
+                            <p className="text-[10px] text-gov-blue font-black mt-1 uppercase tracking-widest">CivicOS National</p>
                         </div>
                     </div>
                     <button 
@@ -548,10 +556,16 @@ export default function CitizenDashboard() {
                             <div className="relative">
                                 <div 
                                     onClick={() => setShowProfileMenu(!showProfileMenu)}
-                                    className="w-10 h-10 rounded-xl overflow-hidden shadow-md cursor-pointer hover:ring-4 hover:ring-gov-blue/10 transition-all active:scale-95"
+                                    className="w-10 h-10 rounded-xl overflow-hidden shadow-md cursor-pointer hover:ring-4 hover:ring-gov-blue/10 transition-all active:scale-95 relative"
                                 >
                                     {userProfile?.profileImageUrl ? (
-                                        <img src={userProfile.profileImageUrl} alt="Avatar" className="w-full h-full object-cover" />
+                                        <Image 
+                                            src={userProfile.profileImageUrl} 
+                                            alt="User Avatar" 
+                                            fill
+                                            className="object-cover" 
+                                            sizes="40px"
+                                        />
                                     ) : (
                                         <div className="w-full h-full bg-slate-200 flex items-center justify-center text-slate-400">
                                             <User className="w-6 h-6" />

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
     LayoutDashboard,
@@ -25,10 +26,18 @@ export default function Sidebar() {
     return (
         <div className="flex flex-col w-64 bg-white border-r border-gray-200 min-h-screen">
             <div className="flex items-center gap-3 px-6 py-8 border-b border-gray-100">
-                <img src="/logo1.png" alt="MCD Logo" className="w-10 h-10 object-contain" />
+                <div className="relative w-10 h-10">
+                    <Image 
+                        src="/logo1.png" 
+                        alt="CivicOS Logo" 
+                        fill
+                        className="object-contain" 
+                        sizes="40px"
+                    />
+                </div>
                 <div className="flex flex-col">
-                    <span className="text-sm font-black text-mcd-navy leading-tight uppercase tracking-tight">MCD CivicOS</span>
-                    <span className="text-[10px] text-mcd-slate font-bold uppercase tracking-widest">Govt. of India</span>
+                    <span className="text-sm font-black text-gov-blue leading-tight uppercase tracking-tight">Govt. of India</span>
+                    <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">CivicOS National</span>
                 </div>
             </div>
 

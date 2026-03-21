@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import dynamic from "next/dynamic";
 import { 
     LayoutDashboard, 
@@ -53,6 +54,26 @@ const MapComponent = dynamic(() => import("@/components/MapComponent"), {
         </div>
     )
 });
+
+// Define a type for the raw document structure from Appwrite or similar backend
+interface RawComplaintDoc {
+    $id?: string;
+    id?: string;
+    userId: string;
+    description: string;
+    category: string;
+    priority: string;
+    department: string;
+    ward: string;
+    lat: number;
+    lng: number;
+    status?: string;
+    assignedTo?: string;
+    $createdAt?: string;
+    createdAt?: string;
+    citizenPhoto?: string;
+    repairPhoto?: string;
+}
 
 export default function MapPage() {
     const router = useRouter();
@@ -114,12 +135,16 @@ export default function MapPage() {
 
                 if (profileRes.success && (!finalProfile || (finalProfile as any).name?.includes('Bridge'))) {
                     try {
-                        const { account: browserAccount, databases: browserDatabases, DATABASE_ID, PROFILES_COLLECTION_ID } = await import('@/lib/appwrite');
+                        const { account: browserAccount, tablesDB: browserTables, DATABASE_ID, PROFILES_COLLECTION_ID } = await import('@/lib/appwrite');
                         const { Query } = await import('appwrite');
                         const browserUser = await browserAccount.get();
-                        const dbResult = await browserDatabases.listDocuments(DATABASE_ID, PROFILES_COLLECTION_ID, [Query.equal('userId', browserUser.$id)]);
-                        if (dbResult.documents.length > 0) {
-                            finalProfile = JSON.parse(JSON.stringify(dbResult.documents[0]));
+                        const dbResult = await browserTables.listRows({
+                            databaseId: DATABASE_ID,
+                            tableId: PROFILES_COLLECTION_ID,
+                            queries: [Query.equal('userId', browserUser.$id)]
+                        });
+                        if (dbResult.rows.length > 0) {
+                            finalProfile = JSON.parse(JSON.stringify(dbResult.rows[0]));
                         }
                     } catch (e) { console.warn("Map Profile Recovery failed"); }
                 }
@@ -161,7 +186,7 @@ export default function MapPage() {
                         const grievancesRes = await getAllGrievancesAction();
                         let cloudGrievances: Complaint[] = [];
                         if (grievancesRes.success && grievancesRes.grievances) {
-                            cloudGrievances = grievancesRes.grievances.map(doc => ({
+                            cloudGrievances = (grievancesRes.grievances as any[]).map((doc: any) => ({
                                 id: doc.$id || doc.id,
                                 userId: doc.userId,
                                 description: doc.description,
@@ -309,6 +334,17 @@ export default function MapPage() {
         document.body.removeChild(link);
     };
 
+    if (isLoading && !userProfile) {
+        return (
+            <div className="flex h-screen w-full items-center justify-center bg-white">
+                <div className="flex flex-col items-center gap-4">
+                    <Loader2 className="w-10 h-10 text-gov-blue animate-spin" />
+                    <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">Loading Spatial Engine...</p>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="flex flex-col h-screen overflow-hidden bg-white">
             {/* Header - Premium Unified Design */}
@@ -372,10 +408,16 @@ export default function MapPage() {
                         </div>
                         <div 
                             onClick={() => setShowProfileMenu(!showProfileMenu)}
-                            className="w-10 h-10 rounded-xl overflow-hidden shadow-2xl ring-2 ring-white cursor-pointer hover:ring-gov-blue/40 transition-all active:scale-95"
+                            className="w-10 h-10 rounded-xl overflow-hidden shadow-2xl ring-2 ring-white cursor-pointer hover:ring-gov-blue/40 transition-all active:scale-95 relative"
                         >
                             {userProfile?.profileImageUrl ? (
-                                <img src={userProfile.profileImageUrl} alt="Avatar" className="w-full h-full object-cover" />
+                                <Image 
+                                    src={userProfile.profileImageUrl} 
+                                    alt="User Avatar" 
+                                    fill
+                                    className="object-cover" 
+                                    sizes="40px"
+                                />
                             ) : (
                                 <div className="w-full h-full bg-slate-200 flex items-center justify-center text-slate-400 font-bold">{userProfile?.name?.charAt(0) || 'U'}</div>
                             )}
@@ -433,11 +475,13 @@ export default function MapPage() {
                     />
 
                     {/* Detail Card Overlay */}
-                    <MapInfoCard 
-                        complaint={selectedComplaint}
-                        onCloseAction={() => setSelectedComplaint(null)}
-                        onTrackAction={handleTrackTicket}
-                    />
+                    {selectedComplaint && (
+                        <MapInfoCard 
+                            complaint={selectedComplaint}
+                            onCloseAction={() => setSelectedComplaint(null)}
+                            onTrackAction={handleTrackTicket}
+                        />
+                    )}
 
                     {/* Floating Map Controls - Refined Placement */}
                     <div className="absolute top-6 right-6 flex flex-col gap-3 z-20">

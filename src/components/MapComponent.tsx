@@ -5,24 +5,26 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Complaint } from '@/lib/types';
 import { ShieldAlert, AlertCircle, CheckCircle, Navigation } from 'lucide-react';
-import ReactDOMServer from 'react-dom/server';
 
-// Fix Leaflet marker icon issues
+// Fix Leaflet marker icon issues without using ReactDOMServer in client
 const createCustomIcon = (status: string) => {
     const color = status === 'Resolved' ? '#10b981' : status === 'In Progress' ? '#f59e0b' : '#ef4444';
+    const iconSvg = status === 'Resolved' 
+        ? '<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 text-white"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>'
+        : status === 'In Progress'
+        ? '<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 text-white"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>'
+        : '<svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 text-white"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>';
     
-    const html = ReactDOMServer.renderToString(
-        <div className="relative flex flex-col items-center">
-            <div className="w-8 h-8 rounded-full border-2 border-white shadow-2xl flex items-center justify-center transform hover:scale-110 transition-transform duration-300" style={{ backgroundColor: color }}>
-                {status === 'Resolved' ? <CheckCircle className="w-5 h-5 text-white" /> : 
-                 status === 'In Progress' ? <AlertCircle className="w-5 h-5 text-white" /> : 
-                 <ShieldAlert className="w-5 h-5 text-white" />}
+    const html = `
+        <div class="relative flex flex-col items-center">
+            <div class="w-8 h-8 rounded-full border-2 border-white shadow-2xl flex items-center justify-center transform hover:scale-110 transition-transform duration-300" style="background-color: ${color}">
+                ${iconSvg}
             </div>
-            <div className="w-1 h-3 shadow-lg -mt-0.5" style={{ backgroundColor: color }}></div>
-            <div className="w-1.5 h-1.5 rounded-full bg-black/20 blur-[1px] mt-0.5"></div>
+            <div class="w-1 h-3 shadow-lg -mt-0.5" style="background-color: ${color}"></div>
+            <div class="w-1.5 h-1.5 rounded-full bg-black/20 blur-[1px] mt-0.5"></div>
         </div>
-    );
-
+    `;
+    
     return L.divIcon({
         html,
         className: 'custom-leaflet-icon',
@@ -33,16 +35,16 @@ const createCustomIcon = (status: string) => {
 };
 
 const UserLocationIcon = L.divIcon({
-    html: ReactDOMServer.renderToString(
-        <div className="relative">
-            <div className="w-6 h-6 bg-blue-600 rounded-full border-4 border-white shadow-2xl flex items-center justify-center animate-pulse">
-                <div className="w-2 h-2 bg-white rounded-full"></div>
+    html: `
+        <div class="relative">
+            <div class="w-6 h-6 bg-blue-600 rounded-full border-4 border-white shadow-2xl flex items-center justify-center animate-pulse">
+                <div class="w-2 h-2 bg-white rounded-full"></div>
             </div>
-            <div className="absolute inset-x-0 -bottom-4 flex justify-center">
-                <div className="w-4 h-1 bg-black/20 blur-[2px] rounded-full"></div>
+            <div class="absolute inset-x-0 -bottom-4 flex justify-center">
+                <div class="w-4 h-1 bg-black/20 blur-[2px] rounded-full"></div>
             </div>
         </div>
-    ),
+    `,
     className: 'user-location-icon',
     iconSize: [24, 24],
     iconAnchor: [12, 12]

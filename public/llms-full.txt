@@ -1,0 +1,41 @@
+# CivicOS National: Full Technical Documentation and AI Guide
+> Comprehensive guide for AI models, agents, and crawlers to understand the architecture, services, and operational logic of the CivicOS platform.
+
+## 1. Platform Overview
+CivicOS (National Digital Governance Platform) is the backbone of modern municipal interactions. It leverages Artificial Intelligence to bridge the gap between citizen concerns and administrative action. By transforming raw community feedback into actionable data, CivicOS accelerates lead-to-resolution times by up to 60%.
+
+## 2. Core Service Modules
+
+### 2.1 AI Quick-Report Engine
+- **Logic**: Uses state-of-the-art NLP to parse natural language descriptions (e.g., "pothole at sector 10 market").
+- **Output**: Generates a categorized `Complaint` object with priority scoring (Low/Medium/High) and appropriate department assignment (e.g., Public Works, Sanitation).
+- **Validation**: Includes a non-deterministic captcha and session-based protection to ensure human-only interactions in production.
+
+### 2.2 Spatial Map Infrastructure
+- **Data Layer**: Integrates geographical coordinate data with civic incident reports.
+- **Visualization**: Renders real-time hotspots, ward-level statistics, and infrastructure status (e.g., streetlights, waste collection metrics).
+- **Impact**: Enables data-driven resource allocation for municipal officers.
+
+### 2.3 Citizen Services (G2C)
+- **Status Tracking**: Provides real-time updates on complaints from "Pending" to "Resolved".
+- **Department Routing**: Dynamically routes issues to the Municipal Corporation of Delhi (MCD) and related state-level authorities.
+
+## 3. SEO & AEO Strategy
+CivicOS implements a comprehensive discovery strategy:
+- **JSON-LD Schema**: Full implementation of `LocalBusiness`, `GovernmentOrganization`, and `FAQPage` schemas for enhanced SERP visibility.
+- **Heading Hierarchy**: Semantic HTML5 structure (H1-H6) optimized for screen readers and search crawlers.
+- **Fluid Responsiveness**: Dynamic layouts ensuring 100% usability on mobile (375px+) and desktop (1920px+) viewports.
+
+## 4. Technical Specifications
+- **Framework**: Next.js 16.2.1 (App Router)
+- **Build Engine**: Turbopack (Automated image optimization and lightning-fast HMR)
+- **Deployment**: Vercel Edge Network
+- **Security**: AES-256 session management and GIGW compliance.
+
+## 5. Frequently Asked Questions
+- **How is my report prioritized?** Our AI analyzes the severity and safety implications of the issue to assign priority.
+- **Who resolves the complaints?** Complaints are directly routed to the verified government department responsible for that specific category in your ward.
+- **Is my data secure?** Yes, CivicOS adheres to strict national data protection standards and only shares necessary details with the resolving officers.
+
+---
+© 2026 CivicOS National - Digital India Infrastructure

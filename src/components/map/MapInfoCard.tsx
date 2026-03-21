@@ -4,6 +4,7 @@ import React from 'react';
 import { X, Clock, MapPin, User, ArrowRight, ShieldAlert, CheckCircle, Timer, Sparkles } from 'lucide-react';
 import { Complaint } from '@/lib/types';
 import Image from 'next/image';
+import { GRIEVANCE_IMAGES_BUCKET_ID, APPWRITE_PROJECT_ID } from '@/lib/appwrite';
 
 interface MapInfoCardProps {
     complaint: Complaint | null;
@@ -12,6 +13,7 @@ interface MapInfoCardProps {
 }
 
 export default function MapInfoCard({ complaint, onCloseAction, onTrackAction }: MapInfoCardProps) {
+    // Note: Complaint is guaranteed non-null by parent conditional render
     if (!complaint) return null;
 
     const getStatusStyles = (status: string) => {
@@ -31,10 +33,12 @@ export default function MapInfoCard({ complaint, onCloseAction, onTrackAction }:
                 {/* Image Section */}
                 <div className="relative h-44 w-full bg-slate-100">
                     {complaint.citizenPhoto ? (
-                        <img 
-                            src={complaint.citizenPhoto} 
+                        <Image 
+                            src={`https://sgp.cloud.appwrite.io/v1/storage/buckets/${GRIEVANCE_IMAGES_BUCKET_ID}/files/${complaint.citizenPhoto}/preview?project=${APPWRITE_PROJECT_ID}`} 
                             alt="Issue" 
-                            className="w-full h-full object-cover"
+                            fill
+                            className="object-cover" 
+                            sizes="(max-width: 768px) 100vw, 384px"
                         />
                     ) : (
                         <div className="w-full h-full flex items-center justify-center text-slate-300 bg-slate-50">

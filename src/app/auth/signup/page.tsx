@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { createPhoneTokenAction, setBridgeCookieAction, getCurrentUserAction } from '@/app/actions/auth';
+import { createPhoneTokenAction, checkRegistrationAction, syncSessionAction, getCurrentUserAction } from '@/app/actions/auth';
 import { account } from '@/lib/appwrite'; // Client-side singleton
 import AuthLayout from '@/components/auth/AuthLayout';
-import { RefreshCw, ChevronRight, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { RefreshCw, ArrowRight, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { generateCaptcha, validateCaptcha } from '@/lib/captcha';
 
 export default function SignupPage() {
@@ -71,29 +71,37 @@ export default function SignupPage() {
 
         setIsLoading(true);
         try {
-            console.log('[SIGNUP] Verifying OTP on client...');
-            // 1. Clear any existing active session to prevent AppwriteException (Session already active)
+            // Step 1: Ensure any old session is cleared (Prevents "session prohibited" errors)
             try {
-                await account.deleteSession('current');
-                console.log('[SIGNUP] Cleared existing stale session');
+                await account.deleteSession({
+                    sessionId: 'current'
+                });
             } catch (e) {
-                // Ignore if no session exists
+                // Ignore
             }
 
-            // 2. Verify OTP and Create Session ON CLIENT directly in Browser
-            const session = await account.updatePhoneSession(userId, otpValue);
+            console.log('[SIGNUP_CLIENT] Verifying OTP on client via Proxy...');
+            await account.createSession({
+                userId,
+                secret: otpValue
+            });
+
+            // STEP 2: Check registration status on the SERVER
+            // The Server Action will now see the PROXY_BRIDGE cookie automatically
+            console.log('[SIGNUP_CLIENT] Session established. Syncing with server...');
+            await new Promise(r => setTimeout(r, 800));
+            const result = await checkRegistrationAction();
             
-            // 3. Set fallback bridge cookie for layout
-            const handoffResult = await setBridgeCookieAction(userId);
-            
-            if (session && handoffResult.success) {
+            if (result.success) {
                 setSuccess('Authenticated successfully! Redirecting...');
+                // For signup, we usually expect them to move to register even if the server check fails 
+                // but the checkRegistrationAction is now robust enough to tell us.
                 window.location.href = '/auth/register';
             } else {
-                setError(handoffResult.error || 'Session created but layout verification failed.');
+                setError(result.error || 'Session created but server sync failed.');
             }
         } catch (err: any) {
-            console.error('[SIGNUP] OTP Verification Error:', err);
+            console.error('[SIGNUP_CLIENT] OTP Verification Error:', err);
             setError(err.message || 'Invalid OTP. Please try again.');
         } finally {
             setIsLoading(false);
@@ -101,7 +109,7 @@ export default function SignupPage() {
     };
 
     return (
-        <AuthLayout title="MCD CivicOS" subtitle="Citizen Registration">
+        <AuthLayout title="Govt. of India" subtitle="CivicOS National — Citizen Registration">
             {error && (
                 <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl flex items-center gap-3 text-red-700 text-sm animate-in shake-1">
                     <AlertCircle className="w-5 h-5 flex-shrink-0" />
@@ -166,7 +174,7 @@ export default function SignupPage() {
                         className="w-full py-5 bg-gov-blue text-white font-black rounded-2xl shadow-xl shadow-gov-blue/20 hover:shadow-2xl transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                     >
                         {isLoading ? <RefreshCw className="w-5 h-5 animate-spin" /> : "Verify Mobile & Continue"}
-                        {!isLoading && <ChevronRight className="w-5 h-5" />}
+                        {!isLoading && <ArrowRight className="w-5 h-5" />}
                     </button>
                     
                     <p className="text-center text-xs font-bold text-slate-400">
@@ -202,6 +210,7 @@ export default function SignupPage() {
                                         onKeyDown={(e) => {
                                             if (e.key === 'Backspace' && !otpArray[index] && index > 0) document.getElementById(`otp-${index - 1}`)?.focus();
                                         }}
+                                        autoComplete="one-time-code"
                                         className={`w-11 h-14 md:h-16 md:w-14 bg-slate-50 border-2 rounded-xl text-2xl font-black text-center transition-all outline-none flex items-center justify-center
                                             ${peekIndex === index || !digit ? 'text-gov-blue' : 'text-transparent'}
                                             ${digit ? 'border-gov-blue/20 bg-white shadow-sm' : 'border-slate-100'}

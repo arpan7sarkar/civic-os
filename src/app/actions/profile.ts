@@ -1,8 +1,8 @@
 'use server';
 
-import { DATABASE_ID, PROFILES_COLLECTION_ID, PROFILE_IMAGES_BUCKET_ID, createAppwriteClient } from '@/lib/appwrite';
+import { DATABASE_ID, PROFILES_COLLECTION_ID, PROFILE_IMAGES_BUCKET_ID, createAppwriteClient, getServerSession } from '@/lib/appwrite';
 import { Query, ID } from 'appwrite';
-import { cookies, headers } from 'next/headers';
+import { cookies } from 'next/headers';
 
 export interface UserProfile {
     userId: string;
@@ -19,58 +19,27 @@ export interface UserProfile {
  */
 export async function getServerProfileAction() {
     try {
-        const cookieStore = await cookies();
-        const headerStore = await headers();
-        const rawCookies = headerStore.get('cookie') || '';
-        
-        // 1. Multi-Layer Session Recovery
-        let sessionSecret = cookieStore.getAll().find(c => c.name.startsWith('a_session_'))?.value;
-        const bridgeUserId = cookieStore.get('civic_auth_verified')?.value;
+        // Multi-Layer Session Recovery
+        const sessionSecret = await getServerSession();
 
-        // Manual Fallback if cookies() fails
-        if (!sessionSecret) {
-            // Check x-civic-session header (from Proxy)
-            sessionSecret = headerStore.get('x-civic-session') || undefined;
-            
-            // Check raw cookies as last resort
-            if (!sessionSecret && rawCookies.includes('a_session_')) {
-                const match = rawCookies.match(/a_session_[^=;]+=([^;]+)/);
-                if (match) sessionSecret = match[1].trim();
-            }
-        }
-
-        console.log(`[PROFILE_SERVER_V5] Session: ${!!sessionSecret}, Bridge: ${!!bridgeUserId}`);
+        console.log(`[PROFILE_SERVER_V7] Session exists: ${!!sessionSecret}`);
 
         if (!sessionSecret) {
-            if (bridgeUserId) {
-                console.log(`[PROFILE_SERVER_V5] Falling back to Bridge UI for UID: ${bridgeUserId}`);
-                return JSON.parse(JSON.stringify({ 
-                    success: true, 
-                    isFullProfile: false,
-                    profile: { 
-                        userId: bridgeUserId, 
-                        name: 'Citizen (Bridge Verified)', 
-                        govIdType: 'Verified', 
-                        govIdNumber: '****' 
-                    } as UserProfile 
-                }));
-            }
             return JSON.parse(JSON.stringify({ success: false, error: 'NO_SESSION' }));
         }
 
         // Real Session Fetch
-        const { account, databases } = createAppwriteClient(sessionSecret);
+        const { account, tablesDB } = createAppwriteClient(sessionSecret);
         const user = await account.get();
         console.log(`[PROFILE_SERVER_V5] Authenticated User: ${user.name} (${user.$id})`);
         
-        const response = await databases.listDocuments(
-            DATABASE_ID,
-            PROFILES_COLLECTION_ID,
-            [Query.equal('userId', user.$id)]
-        );
-
-        if (response.documents.length > 0) {
-            const doc = response.documents[0];
+        try {
+            const doc = await tablesDB.getRow({
+                databaseId: DATABASE_ID,
+                tableId: PROFILES_COLLECTION_ID,
+                rowId: user.$id
+            });
+            
             const profile: UserProfile = {
                 userId: doc.userId,
                 name: doc.name || '',
@@ -85,14 +54,14 @@ export async function getServerProfileAction() {
                 isFullProfile: true, 
                 profile 
             }));
+        } catch (e) {
+            // Profile doc doesn't exist
+            return JSON.parse(JSON.stringify({ 
+                success: true, 
+                isFullProfile: false, 
+                profile: null 
+            }));
         }
-
-        // If no DB profile exists, return null so caller can redirect to register
-        return JSON.parse(JSON.stringify({ 
-            success: true, 
-            isFullProfile: false, 
-            profile: null 
-        }));
     } catch (error: any) {
         console.error("[PROFILE_SERVER_V5] Error:", error.message);
         return JSON.parse(JSON.stringify({ 
@@ -109,32 +78,20 @@ export async function getServerProfileAction() {
  */
 export async function updateUserProfileAction(data: Partial<UserProfile>) {
     try {
-        const cookieStore = await cookies();
-        const sessionSecret = cookieStore.getAll().find(c => c.name.startsWith('a_session_'))?.value;
+        const sessionSecret = await getServerSession();
 
         if (!sessionSecret) return JSON.parse(JSON.stringify({ success: false, error: 'NO_SESSION' }));
 
-        const { databases } = createAppwriteClient(sessionSecret);
+        const { tablesDB } = createAppwriteClient(sessionSecret);
         
         if (!data.userId) return JSON.parse(JSON.stringify({ success: false, error: 'USER_ID_REQUIRED' }));
 
-        const response = await databases.listDocuments(
-            DATABASE_ID,
-            PROFILES_COLLECTION_ID,
-            [Query.equal('userId', data.userId as string)]
-        );
-
-        if (response.documents.length === 0) {
-            return JSON.parse(JSON.stringify({ success: false, error: 'PROFILE_NOT_FOUND' }));
-        }
-
-        const docId = response.documents[0].$id;
-        const result = await databases.updateDocument(
-            DATABASE_ID,
-            PROFILES_COLLECTION_ID,
-            docId,
-            data
-        );
+        const result = await tablesDB.updateRow({
+            databaseId: DATABASE_ID,
+            tableId: PROFILES_COLLECTION_ID,
+            rowId: data.userId as string, // Directly use userId as rowId
+            data: data
+        });
 
         return JSON.parse(JSON.stringify({ success: true, profile: result }));
     } catch (error: any) {
@@ -147,12 +104,11 @@ export async function updateUserProfileAction(data: Partial<UserProfile>) {
  */
 export async function createProfileWithImageAction(formData: FormData) {
     try {
-        const cookieStore = await cookies();
-        const sessionSecret = cookieStore.getAll().find(c => c.name.startsWith('a_session_'))?.value;
+        const sessionSecret = await getServerSession();
 
         if (!sessionSecret) return JSON.parse(JSON.stringify({ success: false, error: 'NO_SESSION' }));
 
-        const { databases, storage } = createAppwriteClient(sessionSecret);
+        const { tablesDB, storage } = createAppwriteClient(sessionSecret);
         const userId = formData.get('userId') as string;
         const name = formData.get('name') as string;
         const govIdType = formData.get('govIdType') as string;
@@ -161,24 +117,24 @@ export async function createProfileWithImageAction(formData: FormData) {
 
         let profileImageUrl = '';
         if (imageFile && imageFile.size > 0) {
-            const upload = await storage.createFile(
-                PROFILE_IMAGES_BUCKET_ID,
-                ID.unique(),
-                imageFile
-            );
-            profileImageUrl = storage.getFileView(
-                PROFILE_IMAGES_BUCKET_ID,
-                upload.$id
-            ).toString();
+            const upload = await storage.createFile({
+                bucketId: PROFILE_IMAGES_BUCKET_ID,
+                fileId: ID.unique(),
+                file: imageFile
+            });
+            profileImageUrl = storage.getFileView({
+                bucketId: PROFILE_IMAGES_BUCKET_ID,
+                fileId: upload.$id
+            }).toString();
         }
 
         const profile: UserProfile = { userId, name, govIdType, govIdNumber, profileImageUrl };
-        const result = await databases.createDocument(
-            DATABASE_ID,
-            PROFILES_COLLECTION_ID,
-            ID.unique(),
-            profile
-        );
+        const result = await tablesDB.createRow({
+            databaseId: DATABASE_ID,
+            tableId: PROFILES_COLLECTION_ID,
+            rowId: userId, // Use userId as rowId for direct access in checkRegistrationAction
+            data: profile
+        });
 
         return JSON.parse(JSON.stringify({ success: true, data: result }));
     } catch (error: any) {

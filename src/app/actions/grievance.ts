@@ -1,7 +1,6 @@
 "use server";
 
-import { cookies } from 'next/headers';
-import { createAppwriteClient, DATABASE_ID, GRIEVANCES_COLLECTION_ID, GRIEVANCE_IMAGES_BUCKET_ID, ID } from '@/lib/appwrite';
+import { createAppwriteClient, DATABASE_ID, GRIEVANCES_COLLECTION_ID, GRIEVANCE_IMAGES_BUCKET_ID, ID, getServerSession } from '@/lib/appwrite';
 import { Complaint } from '@/lib/types';
 
 /**
@@ -9,8 +8,7 @@ import { Complaint } from '@/lib/types';
  */
 export async function uploadGrievanceImageAction(formData: FormData) {
     try {
-        const cookieStore = await cookies();
-        const sessionSecret = cookieStore.getAll().find(c => c.name.startsWith('a_session_'))?.value;
+        const sessionSecret = await getServerSession();
         if (!sessionSecret) return { success: false, error: 'NO_SESSION' };
 
         const { storage } = createAppwriteClient(sessionSecret);
@@ -18,11 +16,11 @@ export async function uploadGrievanceImageAction(formData: FormData) {
         
         if (!file) return { success: false, error: 'NO_FILE' };
 
-        const result = await storage.createFile(
-            GRIEVANCE_IMAGES_BUCKET_ID,
-            ID.unique(),
-            file
-        );
+        const result = await storage.createFile({
+            bucketId: GRIEVANCE_IMAGES_BUCKET_ID,
+            fileId: ID.unique(),
+            file: file
+        });
 
         return { success: true, fileId: result.$id };
     } catch (error: any) {
@@ -36,32 +34,51 @@ export async function uploadGrievanceImageAction(formData: FormData) {
  */
 export async function createGrievanceAction(data: Partial<Complaint>) {
     try {
-        const cookieStore = await cookies();
-        const sessionSecret = cookieStore.getAll().find(c => c.name.startsWith('a_session_'))?.value;
+        const sessionSecret = await getServerSession();
         if (!sessionSecret) return { success: false, error: 'NO_SESSION' };
 
-        const { databases, account: serverAccount } = createAppwriteClient(sessionSecret);
+        const { tablesDB, account: serverAccount } = createAppwriteClient(sessionSecret);
         
         // Get user details to ensure userId is correctly set in document
         const user = await serverAccount.get();
         const userId = user.$id;
-        const { id, ...attributes } = data;
+        const { id, rawDescription, ...attributes } = data; // Destructure rawDescription to omit it from final attributes
         const documentId = id || ID.unique();
 
-        const result = await databases.createDocument(
-            DATABASE_ID,
-            GRIEVANCES_COLLECTION_ID,
-            documentId,
-            {
+        // Normalize IDs in case they have prefixes in some environments but not others
+        // (Note: Appwrite IDs in URLs sometimes show prefixes like 'database-' or 'table-')
+        const finalDbId = DATABASE_ID;
+        const finalCollId = GRIEVANCES_COLLECTION_ID;
+
+        console.log(`[GRIEVANCE_ACTION] Submitting to DB: ${finalDbId}, Coll: ${finalCollId}`);
+        console.log(`[GRIEVANCE_ACTION] Payload:`, { 
+            ...attributes, 
+            userId, 
+            status: attributes.status || 'Pending',
+            createdAt: attributes.createdAt || new Date().toISOString()
+        });
+
+        const result = await tablesDB.createRow({
+            databaseId: DATABASE_ID,
+            tableId: GRIEVANCES_COLLECTION_ID,
+            rowId: documentId,
+            data: {
                 ...attributes,
                 userId: userId, // Force current logged-in user ID
                 status: attributes.status || 'Pending', // Default status
                 createdAt: attributes.createdAt || new Date().toISOString()
             }
-        );
+        });
 
-        return { success: true, complaint: result };
+        console.log(`[GRIEVANCE_ACTION] Success! Doc ID: ${result.$id}`);
+        // Ensure plain object for Next.js 16 serialization
+        return JSON.parse(JSON.stringify({ success: true, complaint: result }));
     } catch (error: any) {
+        // Handle "ID already exists" (409) as success for sync stability
+        if (error.code === 409) {
+            console.warn(`[GRIEVANCE_ACTION] Document ${data.id} already exists, treating as success.`);
+            return { success: true, isConflict: true };
+        }
         console.error("Grievance Creation Error Details:", {
             message: error.message,
             code: error.code,
@@ -78,27 +95,25 @@ import { Query } from 'appwrite';
  */
 export async function getGrievancesAction() {
     try {
-        const cookieStore = await cookies();
-        let sessionSecret = cookieStore.getAll().find(c => c.name.startsWith('a_session_'))?.value;
-        
-        if (!sessionSecret) {
-            const { headers } = await import('next/headers');
-            const headerStore = await headers();
-            sessionSecret = headerStore.get('x-civic-session') || undefined;
-        }
-
+        const sessionSecret = await getServerSession();
         if (!sessionSecret) return { success: false, error: 'NO_SESSION' };
-
-        const { databases, account: serverAccount } = createAppwriteClient(sessionSecret);
+        
+        const { tablesDB, account: serverAccount } = createAppwriteClient(sessionSecret);
         const user = await serverAccount.get();
 
-        const response = await databases.listDocuments(
-            DATABASE_ID,
-            GRIEVANCES_COLLECTION_ID,
-            [Query.equal('userId', user.$id), Query.orderDesc('createdAt')]
-        );
+        // WORKAROUND: In Appwrite 1.8.1, encrypted attributes like 'userId' cannot be queried.
+        // We fetch the latest grievances and filter in-memory for security compliance.
+        const response = await tablesDB.listRows({
+            databaseId: DATABASE_ID,
+            tableId: GRIEVANCES_COLLECTION_ID,
+            queries: [Query.orderDesc('createdAt'), Query.limit(100)]
+        });
 
-        return { success: true, grievances: response.documents };
+        // Filter by the current user's ID manually
+        const userGrievances = response.rows.filter(row => row.userId === user.$id);
+
+        // ALWAYS sanitize for Next.js 16 serialization (Plain Objects only)
+        return JSON.parse(JSON.stringify({ success: true, grievances: userGrievances }));
     } catch (error: any) {
         console.error("Fetch Grievances Error:", error);
         return { success: false, error: error.message };
@@ -110,26 +125,19 @@ export async function getGrievancesAction() {
  */
 export async function getAllGrievancesAction() {
     try {
-        const cookieStore = await cookies();
-        let sessionSecret = cookieStore.getAll().find(c => c.name.startsWith('a_session_'))?.value;
-        
-        if (!sessionSecret) {
-            const { headers } = await import('next/headers');
-            const headerStore = await headers();
-            sessionSecret = headerStore.get('x-civic-session') || undefined;
-        }
-
+        const sessionSecret = await getServerSession();
         if (!sessionSecret) return { success: false, error: 'NO_SESSION' };
+        
+        const { tablesDB } = createAppwriteClient(sessionSecret);
 
-        const { databases } = createAppwriteClient(sessionSecret);
+        const response = await tablesDB.listRows({
+            databaseId: DATABASE_ID,
+            tableId: GRIEVANCES_COLLECTION_ID,
+            queries: [Query.orderDesc('createdAt'), Query.limit(100)]
+        });
 
-        const response = await databases.listDocuments(
-            DATABASE_ID,
-            GRIEVANCES_COLLECTION_ID,
-            [Query.orderDesc('createdAt'), Query.limit(100)]
-        );
-
-        return { success: true, grievances: response.documents };
+        // ALWAYS sanitize for Next.js 16 serialization (Plain Objects only)
+        return JSON.parse(JSON.stringify({ success: true, grievances: response.rows }));
     } catch (error: any) {
         console.error("Fetch All Grievances Error:", error);
         return { success: false, error: error.message };
@@ -141,27 +149,22 @@ export async function getAllGrievancesAction() {
  */
 export async function syncGrievanceUserDetailsAction(userId: string, newName: string) {
     try {
-        const cookieStore = await cookies();
-        let sessionSecret = cookieStore.getAll().find(c => c.name.startsWith('a_session_'))?.value;
-        
-        if (!sessionSecret) {
-            const { headers } = await import('next/headers');
-            const headerStore = await headers();
-            sessionSecret = headerStore.get('x-civic-session') || undefined;
-        }
-
+        const sessionSecret = await getServerSession();
         if (!sessionSecret) return { success: false, error: 'NO_SESSION' };
+        
+        const { tablesDB } = createAppwriteClient(sessionSecret);
 
-        const { databases } = createAppwriteClient(sessionSecret);
+        // WORKAROUND: Cannot query encrypted 'userId'. Fetch and filter.
+        const response = await tablesDB.listRows({
+            databaseId: DATABASE_ID,
+            tableId: GRIEVANCES_COLLECTION_ID,
+            queries: [Query.limit(500)] // High limit for sync operations
+        });
 
-        // Fetch all complaints owned by the user
-        const response = await databases.listDocuments(
-            DATABASE_ID,
-            GRIEVANCES_COLLECTION_ID,
-            [Query.equal('userId', userId)]
-        );
+        const userRows = response.rows.filter(row => row.userId === userId);
+        console.log(`[SYNC_GRIEVANCES] Found ${userRows.length} grievances for ${userId} to sync with name: ${newName}`);
 
-        console.log(`[SYNC_GRIEVANCES] Found ${response.documents.length} grievances for ${userId} to sync with name: ${newName}`);
+        return { success: true, syncedCount: userRows.length };
 
         // Update each document to have the new user details in descriptions or wherever needed if we stored name
         // Wait, does Grievance store the user's name? 
@@ -169,7 +172,7 @@ export async function syncGrievanceUserDetailsAction(userId: string, newName: st
         // If they rely on joins, we don't need to update.
         // Looking at the dashboard, name isn't directly on the grievance.
         
-        return { success: true, syncedCount: response.documents.length };
+        return { success: true, syncedCount: response.rows.length };
     } catch (error: any) {
         console.error("Sync Grievances Error:", error);
         return { success: false, error: error.message };
