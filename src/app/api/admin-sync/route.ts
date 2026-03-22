@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createAppwriteClient, DATABASE_ID, GRIEVANCES_COLLECTION_ID, PROFILES_COLLECTION_ID } from '@/lib/appwrite';
+import { createAppwriteClient, DATABASE_ID, GRIEVANCES_COLLECTION_ID, PROFILES_COLLECTION_ID } from '@/lib/appwrite.server';
 import { Query } from 'appwrite';
 
 /**
