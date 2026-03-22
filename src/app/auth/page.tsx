@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import AuthLayout from '@/components/auth/AuthLayout';
 import { account } from '@/lib/appwrite';
-import { createPhoneTokenAction, checkRegistrationAction, getCurrentUserAction, officialLoginAction, syncSessionAction } from '@/app/actions/auth';
+import { createPhoneTokenAction, verifyOtpAction, checkRegistrationAction, getCurrentUserAction, officialLoginAction, syncSessionAction } from '@/app/actions/auth';
 import { generateCaptcha, validateCaptcha } from '@/lib/captcha';
 import {
     Shield,
@@ -92,26 +92,9 @@ export default function AuthGatewayPage() {
 
         setIsLoading(true);
         try {
-            // Step 1: Ensure any old session is cleared (Prevents "session prohibited" errors)
-            try {
-                await account.deleteSession({
-                    sessionId: 'current'
-                });
-            } catch (e) {
-                // Ignore if no session exists or bridge is not found locally
-            }
-
-            // Step 2: Create Session via Proxy Client SDK
-            console.log("[AUTH_CLIENT] Updating phone session via Proxy...");
-            await account.createSession({
-                userId,
-                secret: otpValue
-            });
-
-            // Step 3: Server Handshake (Wait a beat for cookie to settle)
-            console.log("[AUTH_CLIENT] Session established. Syncing with server...");
-            await new Promise(r => setTimeout(r, 500));
-            const result = await checkRegistrationAction();
+            // STEP 1: Verify OTP and Establish Session on API routes securely
+            console.log("[AUTH_CLIENT] Verifying OTP and establishing session via Server Action...");
+            const result = await verifyOtpAction(userId, otpValue);
 
             if (result.success) {
                 setSuccess('Authentication successful');
@@ -145,26 +128,9 @@ export default function AuthGatewayPage() {
 
         setIsLoading(true);
         try {
-            // Step 1: Ensure any old session is cleared (Prevents conflict errors)
-            try {
-                await account.deleteSession({
-                    sessionId: 'current'
-                });
-            } catch (e) {
-                // Ignore
-            }
-
-            // STEP 2: Establish session on the CLIENT via Proxy (Email/Password)
-            console.log("[AUTH_OFFICIAL] Authenticating via Client SDK (Proxied)...");
-            await account.createEmailPasswordSession({
-                email: officialEmail,
-                password: officialPassword
-            });
-
-            // STEP 3: Verify on server (Wait a beat for proxy bridge cookies to settle)
-            console.log("[AUTH_OFFICIAL] Session established. Finalizing server handshake...");
-            await new Promise(r => setTimeout(r, 800));
-            const result = await getCurrentUserAction();
+            // STEP 1: Establish session strictly on the SERVER
+            console.log("[AUTH_OFFICIAL] Authenticating via Server Action...");
+            const result = await officialLoginAction(officialEmail, officialPassword);
 
             if (result.success) {
                 setSuccess('Official Authentication successful');

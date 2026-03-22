@@ -32,7 +32,7 @@ export function syncGrievances(cloudGrievances: any[], userId: string) {
     if (typeof window === 'undefined') return;
     
     const stored = localStorage.getItem(STORAGE_KEY);
-    let localGrievances: Complaint[] = stored ? JSON.parse(stored) : [];
+    const localGrievances: Complaint[] = stored ? JSON.parse(stored) : [];
     
     // Convert cloud format to local Complaint type if needed
     const normalizedCloud = cloudGrievances.map(doc => ({

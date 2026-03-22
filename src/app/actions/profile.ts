@@ -1,8 +1,9 @@
 'use server';
 
-import { DATABASE_ID, PROFILES_COLLECTION_ID, PROFILE_IMAGES_BUCKET_ID, createAppwriteClient, getServerSession } from '@/lib/appwrite';
+import { DATABASE_ID, PROFILES_COLLECTION_ID, PROFILE_IMAGES_BUCKET_ID, createAppwriteClient, getServerSession } from '@/lib/appwrite.server';
 import { Query, ID } from 'appwrite';
 import { cookies } from 'next/headers';
+import { env } from '@/lib/env';
 
 export interface UserProfile {
     userId: string;
@@ -122,10 +123,9 @@ export async function createProfileWithImageAction(formData: FormData) {
                 fileId: ID.unique(),
                 file: imageFile
             });
-            profileImageUrl = storage.getFileView({
-                bucketId: PROFILE_IMAGES_BUCKET_ID,
-                fileId: upload.$id
-            }).toString();
+            const endpoint = env.APPWRITE_ENDPOINT || 'https://sgp.cloud.appwrite.io/v1';
+            const projectId = env.APPWRITE_PROJECT_ID || '';
+            profileImageUrl = `${endpoint}/storage/buckets/${PROFILE_IMAGES_BUCKET_ID}/files/${upload.$id}/view?project=${projectId}`;
         }
 
         const profile: UserProfile = { userId, name, govIdType, govIdNumber, profileImageUrl };

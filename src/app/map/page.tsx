@@ -410,18 +410,19 @@ export default function MapPage() {
                             onClick={() => setShowProfileMenu(!showProfileMenu)}
                             className="w-10 h-10 rounded-xl overflow-hidden shadow-2xl ring-2 ring-white cursor-pointer hover:ring-gov-blue/40 transition-all active:scale-95 relative"
                         >
-                            {userProfile?.profileImageUrl ? (
+                            {userProfile?.profileImageUrl && userProfile.profileImageUrl.startsWith('http') ? (
                                 <Image 
                                     src={userProfile.profileImageUrl} 
                                     alt="User Avatar" 
                                     fill
-                                    className="object-cover" 
-                                    sizes="40px"
+                                    className="object-cover"
+                                    sizes="32px"
                                 />
                             ) : (
-                                <div className="w-full h-full bg-slate-200 flex items-center justify-center text-slate-400 font-bold">{userProfile?.name?.charAt(0) || 'U'}</div>
-                            )}
-                        </div>
+                                <div className="w-full h-full bg-slate-200 flex items-center justify-center text-slate-400">
+                                    <User className="w-4 h-4" />
+                                </div>
+                            )}</div>
                         {showProfileMenu && (
                             <div className="absolute top-full right-0 mt-3 w-56 bg-white rounded-2xl shadow-2xl border border-slate-100 py-2.5 z-[200] animate-in fade-in slide-in-from-top-2">
                                 <button className="w-full text-left px-5 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-3">

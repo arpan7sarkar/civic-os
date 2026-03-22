@@ -96,8 +96,8 @@ export default function RegisterProfilePage() {
             } else {
                 setError(result.error || 'Failed to save profile.');
             }
-        } catch (err: any) {
-            setError('An unexpected error occurred during profile processing.');
+        } catch (err: unknown) {
+            setError((err as Error).message || 'An unexpected error occurred during profile processing.');
         } finally {
             setIsLoading(false);
         }

@@ -13,9 +13,11 @@ const PROJECT_ID = env.APPWRITE_PROJECT_ID || '';
  */
 const createBrowserClient = () => {
     const c = new Client();
-    // Appwrite SDK requires a protocol + domain. Using location.origin ensures 
-    // it stays on OUR domain for first-party cookie support via proxy.
-    const endpoint = typeof window !== 'undefined' ? `${window.location.origin}/appwrite-proxy` : '/appwrite-proxy';
+    // Ensure relative endpoints get the full origin for the Appwrite SDK
+    const rawEndpoint = env.APPWRITE_ENDPOINT || '/appwrite-proxy';
+    const endpoint = (typeof window !== 'undefined' && rawEndpoint.startsWith('/')) 
+        ? `${window.location.origin}${rawEndpoint}` 
+        : rawEndpoint;
     c.setEndpoint(endpoint).setProject(PROJECT_ID);
     return c;
 };

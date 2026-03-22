@@ -558,7 +558,7 @@ export default function CitizenDashboard() {
                                     onClick={() => setShowProfileMenu(!showProfileMenu)}
                                     className="w-10 h-10 rounded-xl overflow-hidden shadow-md cursor-pointer hover:ring-4 hover:ring-gov-blue/10 transition-all active:scale-95 relative"
                                 >
-                                    {userProfile?.profileImageUrl ? (
+                                    {userProfile?.profileImageUrl && userProfile.profileImageUrl.startsWith('http') ? (
                                         <Image 
                                             src={userProfile.profileImageUrl} 
                                             alt="User Avatar" 
