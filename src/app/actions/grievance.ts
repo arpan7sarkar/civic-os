@@ -3,6 +3,7 @@
 import { createAppwriteClient, DATABASE_ID, GRIEVANCES_COLLECTION_ID, GRIEVANCE_IMAGES_BUCKET_ID, ID, getServerSession } from '@/lib/appwrite';
 import { Complaint } from '@/lib/types';
 import { InputFile } from 'node-appwrite/file';
+import { Schemas, sanitizeString } from "@/lib/security";
 
 /**
  * Upload an image for a grievance
@@ -48,20 +49,34 @@ export async function createGrievanceAction(data: Partial<Complaint>) {
         const user = await serverAccount.get();
         const userId = user.$id;
         const { id, rawDescription, ...attributes } = data; // Destructure rawDescription to omit it from final attributes
+
+        // 1. Validate Input Payload
+        const vPayload = Schemas.grievance.create.safeParse({
+            category: attributes.category,
+            description: attributes.description,
+            ward: attributes.ward,
+            latitude: attributes.lat,
+            longitude: attributes.lng,
+            address: attributes.department, // Deprecated map field check: reuse department or similar if needed
+        });
+
+        if (!vPayload.success) {
+            console.error("[GRIEVANCE_ACTION] Validation Failed:", vPayload.error.flatten());
+            return { success: false, error: "VALIDATION_ERROR", details: vPayload.error.flatten() };
+        }
+
+        const cleanData = vPayload.data;
         const documentId = id || ID.unique();
 
+        // 2. Sanitize Strings
+        const safeDescription = sanitizeString(cleanData.description);
+        const safeWard = sanitizeString(cleanData.ward || "");
+
         // Normalize IDs in case they have prefixes in some environments but not others
-        // (Note: Appwrite IDs in URLs sometimes show prefixes like 'database-' or 'table-')
         const finalDbId = DATABASE_ID;
         const finalCollId = GRIEVANCES_COLLECTION_ID;
 
         console.log(`[GRIEVANCE_ACTION] Submitting to DB: ${finalDbId}, Coll: ${finalCollId}`);
-        console.log(`[GRIEVANCE_ACTION] Payload:`, { 
-            ...attributes, 
-            userId, 
-            status: attributes.status || 'Pending',
-            createdAt: attributes.createdAt || new Date().toISOString()
-        });
 
         const result = await tablesDB.createRow({
             databaseId: DATABASE_ID,
@@ -69,7 +84,9 @@ export async function createGrievanceAction(data: Partial<Complaint>) {
             rowId: documentId,
             data: {
                 ...attributes,
-                userId: userId, // Force current logged-in user ID
+                description: safeDescription, // Use sanitized description
+                ward: safeWard,               // Use sanitized ward
+                userId: userId,               // Force current logged-in user ID
                 status: attributes.status || 'Pending', // Default status
                 createdAt: attributes.createdAt || new Date().toISOString()
             }

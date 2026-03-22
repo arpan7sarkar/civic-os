@@ -4,6 +4,7 @@ import { createAppwriteClient, getServerSession, ID } from '@/lib/appwrite.serve
 import { cookies } from 'next/headers';
 import { env } from '@/lib/env';
 import { Query } from 'appwrite';
+import { Schemas, sanitizeString } from "@/lib/security";
 
 /**
  * Send OTP to mobile
@@ -11,16 +12,24 @@ import { Query } from 'appwrite';
 export async function createPhoneTokenAction(mobile: string) {
     try {
         console.log(`[AUTH_ACTION] Creating phone token for: ${mobile}`);
-        // Use the singleton client for public actions like token creation
+
+        // 1. Validate Input
+        const validated = Schemas.auth.phone.safeParse(mobile);
+        if (!validated.success) {
+            return JSON.parse(JSON.stringify({ success: false, error: "Invalid phone number format." }));
+        }
+        const cleanMobile = validated.data;
+        
+        // 2. Use the singleton client for public actions like token creation
         const { account: serverAccount } = createAppwriteClient();
         
         // Appwrite v23 modern object-style parameter
         const token = await serverAccount.createPhoneToken({
             userId: ID.unique(),
-            phone: '+91' + mobile
+            phone: cleanMobile.startsWith('+') ? cleanMobile : '+91' + cleanMobile
         });
         
-        console.log(`[AUTH_ACTION] Token created for: ${mobile}, UserId: ${token.userId}`);
+        console.log(`[AUTH_ACTION] Token created for: ${cleanMobile}, UserId: ${token.userId}`);
         return JSON.parse(JSON.stringify({ 
             success: true, 
             userId: token.userId 
@@ -37,6 +46,15 @@ export async function createPhoneTokenAction(mobile: string) {
 export async function verifyOtpAction(userId: string, secret: string) {
     try {
         console.log(`[AUTH_ACTION] Verifying OTP for: ${userId}`);
+
+        // 1. Validate Input
+        const vUserId = Schemas.auth.userId.safeParse(userId);
+        const vSecret = Schemas.auth.otp.safeParse(secret);
+        if (!vUserId.success || !vSecret.success) {
+            return JSON.parse(JSON.stringify({ success: false, error: "Invalid ID or OTP format." }));
+        }
+        const cleanUserId = vUserId.data;
+        const cleanSecret = vSecret.data;
         
         // We use native fetch to intercept the Set-Cookie header because the SDK
         // strips the session secret without an Admin API key.
@@ -46,7 +64,7 @@ export async function verifyOtpAction(userId: string, secret: string) {
                 'Content-Type': 'application/json',
                 'X-Appwrite-Project': env.APPWRITE_PROJECT_ID || ''
             },
-            body: JSON.stringify({ userId, secret })
+            body: JSON.stringify({ userId: cleanUserId, secret: cleanSecret })
         });
 
         if (!response.ok) {

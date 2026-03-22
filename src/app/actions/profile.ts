@@ -5,6 +5,7 @@ import { Query, ID } from 'appwrite';
 import { cookies } from 'next/headers';
 import { env } from '@/lib/env';
 import { InputFile } from 'node-appwrite/file';
+import { Schemas, sanitizeString } from "@/lib/security";
 
 export interface UserProfile {
     userId: string;
@@ -100,11 +101,26 @@ export async function updateUserProfileAction(data: Partial<UserProfile>) {
         
         if (!data.userId) return JSON.parse(JSON.stringify({ success: false, error: 'USER_ID_REQUIRED' }));
 
+        // 1. Validate Input
+        const vPayload = Schemas.profile.update.safeParse(data);
+        if (!vPayload.success) {
+            return JSON.parse(JSON.stringify({ success: false, error: "VALIDATION_ERROR", details: vPayload.error.flatten() }));
+        }
+        const cleanData = vPayload.data;
+
+        // 2. Sanitize Strings
+        const safeProfile = {
+            ...cleanData,
+            name: sanitizeString(cleanData.name),
+            bio: sanitizeString(cleanData.bio || ""),
+            address: sanitizeString(cleanData.address || ""),
+        };
+
         const result = await tablesDB.updateRow({
             databaseId: DATABASE_ID,
             tableId: PROFILES_COLLECTION_ID,
             rowId: data.userId as string, // Directly use userId as rowId
-            data: data
+            data: safeProfile
         });
 
         return JSON.parse(JSON.stringify({ success: true, profile: result }));
@@ -145,7 +161,11 @@ export async function createProfileWithImageAction(formData: FormData) {
             profileImageUrl = `${endpoint}/storage/buckets/${PROFILE_IMAGES_BUCKET_ID}/files/${upload.$id}/view?project=${projectId}`;
         }
 
-        const profile: UserProfile = { userId, name, govIdType, govIdNumber, profileImageUrl };
+        // 1. Sanitize Basic Inputs
+        const safeName = sanitizeString(name);
+        const safeGovIdNumber = sanitizeString(govIdNumber);
+
+        const profile: UserProfile = { userId, name: safeName, govIdType, govIdNumber: safeGovIdNumber, profileImageUrl };
         const result = await tablesDB.createRow({
             databaseId: DATABASE_ID,
             tableId: PROFILES_COLLECTION_ID,
