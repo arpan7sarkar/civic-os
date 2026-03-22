@@ -4,6 +4,7 @@ import { createAppwriteClient, DATABASE_ID, GRIEVANCES_COLLECTION_ID, GRIEVANCE_
 import { Complaint } from '@/lib/types';
 import { InputFile } from 'node-appwrite/file';
 import { Schemas, sanitizeString } from "@/lib/security";
+import { standardLimiter, getClientIp } from "@/lib/ratelimit";
 
 /**
  * Upload an image for a grievance
@@ -40,6 +41,13 @@ export async function uploadGrievanceImageAction(formData: FormData) {
  */
 export async function createGrievanceAction(data: Partial<Complaint>) {
     try {
+        // 0. Rate Limiting (Standard)
+        const ip = await getClientIp();
+        const { success: limitOk } = await standardLimiter.limit(ip);
+        if (!limitOk) {
+            return { success: false, error: 'RATE_LIMIT_EXCEEDED' };
+        }
+
         const sessionSecret = await getServerSession();
         if (!sessionSecret) return { success: false, error: 'NO_SESSION' };
 

@@ -6,6 +6,7 @@ import { cookies } from 'next/headers';
 import { env } from '@/lib/env';
 import { InputFile } from 'node-appwrite/file';
 import { Schemas, sanitizeString } from "@/lib/security";
+import { standardLimiter, getClientIp } from "@/lib/ratelimit";
 
 export interface UserProfile {
     userId: string;
@@ -93,6 +94,13 @@ export async function getServerProfileAction() {
  */
 export async function updateUserProfileAction(data: Partial<UserProfile>) {
     try {
+        // 0. Rate Limiting (Standard)
+        const ip = await getClientIp();
+        const { success: limitOk } = await standardLimiter.limit(ip);
+        if (!limitOk) {
+            return JSON.parse(JSON.stringify({ success: false, error: 'RATE_LIMIT_EXCEEDED' }));
+        }
+
         const sessionSecret = await getServerSession();
 
         if (!sessionSecret) return JSON.parse(JSON.stringify({ success: false, error: 'NO_SESSION' }));
@@ -134,6 +142,13 @@ export async function updateUserProfileAction(data: Partial<UserProfile>) {
  */
 export async function createProfileWithImageAction(formData: FormData) {
     try {
+        // 0. Rate Limiting (Standard)
+        const ip = await getClientIp();
+        const { success: limitOk } = await standardLimiter.limit(ip);
+        if (!limitOk) {
+            return JSON.parse(JSON.stringify({ success: false, error: 'RATE_LIMIT_EXCEEDED' }));
+        }
+
         const sessionSecret = await getServerSession();
 
         if (!sessionSecret) return JSON.parse(JSON.stringify({ success: false, error: 'NO_SESSION' }));

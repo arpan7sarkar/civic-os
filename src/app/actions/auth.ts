@@ -5,12 +5,20 @@ import { cookies } from 'next/headers';
 import { env } from '@/lib/env';
 import { Query } from 'appwrite';
 import { Schemas, sanitizeString } from "@/lib/security";
+import { strictLimiter, getClientIp } from "@/lib/ratelimit";
 
 /**
  * Send OTP to mobile
  */
 export async function createPhoneTokenAction(mobile: string) {
     try {
+        // 0. Rate Limiting (Strict)
+        const ip = await getClientIp();
+        const { success: limitOk } = await strictLimiter.limit(ip);
+        if (!limitOk) {
+            return JSON.parse(JSON.stringify({ success: false, error: "Too many requests. Please try again later." }));
+        }
+
         console.log(`[AUTH_ACTION] Creating phone token for: ${mobile}`);
 
         // 1. Validate Input
@@ -45,6 +53,13 @@ export async function createPhoneTokenAction(mobile: string) {
  */
 export async function verifyOtpAction(userId: string, secret: string) {
     try {
+        // 0. Rate Limiting (Strict)
+        const ip = await getClientIp();
+        const { success: limitOk } = await strictLimiter.limit(ip);
+        if (!limitOk) {
+            return JSON.parse(JSON.stringify({ success: false, error: "Too many verification attempts. Please wait a minute." }));
+        }
+
         console.log(`[AUTH_ACTION] Verifying OTP for: ${userId}`);
 
         // 1. Validate Input
