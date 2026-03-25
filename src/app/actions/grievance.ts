@@ -208,6 +208,105 @@ export async function getGrievancesAction() {
 }
 
 /**
+ * Paginated fetch of a user's own grievances for "My Reports" page.
+ * Uses cursor-based pagination (Appwrite cursor after a document).
+ * Because `userId` is encrypted and cannot be queried directly, we fetch
+ * larger batches server-side and filter by session user, advancing the
+ * cursor until we have `limit` user-owned records or exhausted the DB.
+ */
+export async function getMyGrievancesPaginatedAction({
+    cursor,
+    limit = 25,
+}: {
+    cursor?: string;
+    limit?: number;
+} = {}) {
+    try {
+        const sessionSecret = await getServerSession();
+        if (!sessionSecret) return { success: false, error: 'NO_SESSION' };
+
+        const { tablesDB, account: serverAccount } = createAppwriteClient(sessionSecret);
+
+        // Retry for network stability
+        let user;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+                user = await serverAccount.get();
+                break;
+            } catch (err: any) {
+                if (attempt === 3) throw err;
+                await new Promise(r => setTimeout(r, 600 * attempt));
+            }
+        }
+        if (!user) return { success: false, error: 'USER_NOT_FOUND' };
+
+        const userId = user.$id;
+        const collected: any[] = [];
+        let lastCursor: string | undefined = cursor;
+        let hasMore = false;
+        // We need to fetch batches of 100 and filter until we have `limit` user rows
+        // or we run out of documents
+        let batchLimit = 100;
+        let exhausted = false;
+
+        while (collected.length < limit && !exhausted) {
+            const queries: any[] = [Query.orderDesc('createdAt'), Query.limit(batchLimit)];
+            if (lastCursor) {
+                queries.push(Query.cursorAfter(lastCursor));
+            }
+
+            const response = await tablesDB.listRows({
+                databaseId: DATABASE_ID,
+                tableId: GRIEVANCES_COLLECTION_ID,
+                queries
+            });
+
+            const docs = response.documents as any[];
+            if (docs.length === 0) {
+                exhausted = true;
+                break;
+            }
+
+            const userDocs = docs.filter((row: any) => row.userId === userId);
+            for (const doc of userDocs) {
+                if (collected.length < limit) {
+                    collected.push({ ...doc, id: doc.$id });
+                } else {
+                    // We have enough for this page; signal more exist
+                    hasMore = true;
+                    break;
+                }
+            }
+
+            // Check if there are more docs in DB at all
+            if (docs.length < batchLimit) {
+                exhausted = true;
+            } else {
+                // Advance cursor to last doc in this batch
+                lastCursor = docs[docs.length - 1].$id;
+                // If we still need more but we already found enough for the page
+                if (collected.length >= limit && !hasMore) {
+                    hasMore = true; // might be more
+                }
+            }
+        }
+
+        // nextCursor: last doc in collected set, for next page
+        const nextCursor = collected.length > 0 ? collected[collected.length - 1].$id : undefined;
+
+        return JSON.parse(JSON.stringify({
+            success: true,
+            grievances: collected,
+            nextCursor: hasMore ? nextCursor : null,
+            hasMore,
+        }));
+    } catch (error: any) {
+        console.error('[GRIEVANCE_ACTION] getMyGrievancesPaginated Error:', error);
+        return { success: false, error: error.message };
+    }
+}
+
+/**
  * Fetch ALL grievances for the global map (Authority Portal)
  * Hardened with retries for stability.
  */

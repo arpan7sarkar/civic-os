@@ -26,16 +26,18 @@ interface InfrastructureAlert {
 }
 
 /**
- * Sync Appwrite grievances with local storage for MIS consistency
+ * Sync Appwrite grievances with local storage for MIS consistency.
+ * Deduplicates by immutable report id; keeps the record with the
+ * newest updatedAt/createdAt when conflicts exist (cloud is canonical).
  */
 export function syncGrievances(cloudGrievances: any[], userId: string) {
     if (typeof window === 'undefined') return;
-    
+
     const stored = localStorage.getItem(STORAGE_KEY);
     const localGrievances: Complaint[] = stored ? JSON.parse(stored) : [];
-    
-    // Convert cloud format to local Complaint type if needed
-    const normalizedCloud = cloudGrievances.map(doc => ({
+
+    // Normalize cloud documents to the local Complaint shape
+    const normalizedCloud: Complaint[] = cloudGrievances.map(doc => ({
         id: doc.$id || doc.id,
         userId: doc.userId,
         description: doc.description,
@@ -49,19 +51,30 @@ export function syncGrievances(cloudGrievances: any[], userId: string) {
         assignedTo: doc.assignedTo,
         createdAt: doc.createdAt || doc.$createdAt,
         citizenPhoto: doc.citizenPhoto,
-        repairPhoto: doc.repairPhoto
+        repairPhoto: doc.repairPhoto,
     } as Complaint));
 
-    // Merge: Cloud data wins for existing IDs
-    const merged = [...normalizedCloud];
-    
-    // Add local-only ones (like demo data or unsynced ones)
-    localGrievances.forEach(local => {
-        if (!normalizedCloud.find(c => c.id === local.id)) {
-            merged.push(local);
+    // Build a map keyed by stable id, cloud wins on conflict
+    const mergeMap = new Map<string, Complaint>();
+
+    // Seed with local data first
+    localGrievances.forEach(local => mergeMap.set(local.id, local));
+
+    // Cloud overwrites local for same id, or adds new entries.
+    // If both have the same id, pick the one with the newest timestamp.
+    normalizedCloud.forEach(cloud => {
+        const existing = mergeMap.get(cloud.id);
+        if (!existing) {
+            mergeMap.set(cloud.id, cloud);
+        } else {
+            // Cloud is canonical: prefer it if its createdAt is >= local
+            const cloudTs = new Date(cloud.createdAt || 0).getTime();
+            const localTs = new Date(existing.createdAt || 0).getTime();
+            mergeMap.set(cloud.id, cloudTs >= localTs ? cloud : existing);
         }
     });
 
+    const merged = Array.from(mergeMap.values());
     localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
     return merged;
 }

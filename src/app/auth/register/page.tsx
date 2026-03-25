@@ -76,6 +76,17 @@ export default function RegisterProfilePage() {
             return;
         }
 
+        // Basic validation for Aadhaar/ID number: 12 digits, integers only
+        const isDigitsOnly = /^\d+$/.test(govIdNumber);
+        if (!isDigitsOnly) {
+            setError('ID Number must only contain digits.');
+            return;
+        }
+        if (govIdNumber.length !== 12) {
+            setError('ID Number must be exactly 12 digits.');
+            return;
+        }
+
         setIsLoading(true);
         try {
             const formData = new FormData();
@@ -121,7 +132,7 @@ export default function RegisterProfilePage() {
             <div className="space-y-8">
                 {error && (
                     <div className="p-4 bg-red-50 border border-red-100 rounded-xl flex items-center gap-3 text-red-700 text-sm">
-                        <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                        <AlertCircle className="w-5 h-5 shrink-0" />
                         {error}
                     </div>
                 )}
@@ -190,9 +201,15 @@ export default function RegisterProfilePage() {
                                     <input 
                                         type="text" 
                                         value={govIdNumber}
-                                        onChange={(e) => setGovIdNumber(e.target.value)}
+                                        onChange={(e) => {
+                                            const val = e.target.value.replace(/\D/g, ''); // Digits only
+                                            if (val.length <= 12) {
+                                                setGovIdNumber(val);
+                                            }
+                                        }}
                                         autoComplete="off"
-                                        placeholder="ID Number"
+                                        maxLength={12}
+                                        placeholder="12 Digit ID Number"
                                         className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-800 focus:bg-white focus:border-gov-blue outline-none transition-all placeholder:text-slate-300"
                                     />
                                 </div>
