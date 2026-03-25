@@ -380,7 +380,7 @@ export default function CitizenDashboard() {
         }
     }, [lat, lng, complaints]);
 
-    const handleUpdateProfile = async (e: React.FormEvent) => {
+    const handleUpdateProfile = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (!userProfile) return;
         
@@ -473,7 +473,7 @@ export default function CitizenDashboard() {
                     <SidebarLink icon={<LayoutDashboard className="w-4 h-4" />} label="Overview" href="/dashboard" active />
                     <SidebarLink icon={<ClipboardList className="w-4 h-4" />} label="My Reports" href="/dashboard/my-reports" />
                     <SidebarLink icon={<Map className="w-4 h-4" />} label="Local Map" href="/map" />
-                    <SidebarLink icon={<ShieldAlert className="w-4 h-4" />} label="Emergency" href="/dashboard" />
+                    <SidebarLink icon={<ShieldAlert className="w-4 h-4" />} label="Emergency" href="/emergency" />
                     
                     <div className="pt-8 pb-2 px-4 text-[10px] font-black text-slate-300 uppercase tracking-widest">Support</div>
                     <SidebarLink icon={<Settings className="w-4 h-4" />} label="Preferences" href="/dashboard" />
@@ -1028,7 +1028,7 @@ function MandatoryProfileUpdateModal({ userProfile, onComplete }: { userProfile:
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setError('');
         if (!name || !govIdNumber) {

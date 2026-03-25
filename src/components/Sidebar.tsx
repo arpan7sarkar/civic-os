@@ -9,7 +9,8 @@ import {
     BarChart3,
     CheckSquare,
     FileText,
-    User
+    User,
+    ShieldAlert
 } from "lucide-react";
 
 const navigation = [
@@ -18,6 +19,7 @@ const navigation = [
     { name: 'Ward Analytics', href: '#', icon: BarChart3 },
     { name: 'Department Tasks', href: '#', icon: CheckSquare },
     { name: 'Reports', href: '#', icon: FileText },
+    { name: 'Emergency', href: '/emergency', icon: ShieldAlert },
 ];
 
 export default function Sidebar() {
