@@ -16,9 +16,9 @@ import {
 const navigation = [
     { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Live Map', href: '/map', icon: MapIcon },
-    { name: 'Ward Analytics', href: '#', icon: BarChart3 },
-    { name: 'Department Tasks', href: '#', icon: CheckSquare },
-    { name: 'Reports', href: '#', icon: FileText },
+    { name: 'Ward Analytics', href: '/dashboard/analytics', icon: BarChart3 },
+    { name: 'Department Tasks', href: '/dashboard/tasks', icon: CheckSquare },
+    { name: 'Reports', href: '/dashboard/my-reports', icon: FileText },
     { name: 'Emergency', href: '/emergency', icon: ShieldAlert },
 ];
 
