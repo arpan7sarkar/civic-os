@@ -471,7 +471,7 @@ export default function CitizenDashboard() {
 
                 <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
                     <SidebarLink icon={<LayoutDashboard className="w-4 h-4" />} label="Overview" href="/dashboard" active />
-                    <SidebarLink icon={<ClipboardList className="w-4 h-4" />} label="My Reports" href="/dashboard" />
+                    <SidebarLink icon={<ClipboardList className="w-4 h-4" />} label="My Reports" href="/dashboard/my-reports" />
                     <SidebarLink icon={<Map className="w-4 h-4" />} label="Local Map" href="/map" />
                     <SidebarLink icon={<ShieldAlert className="w-4 h-4" />} label="Emergency" href="/dashboard" />
                     
