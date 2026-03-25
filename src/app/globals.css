@@ -1,66 +1,72 @@
 @import "tailwindcss";
 
-@theme {
+:root {
+  --background: #ffffff;
+  --foreground: #0f172a;
   --color-primary: #0B6E6D;
   --color-gov-blue: #145369;
   --color-gov-blue-dark: #0c3240;
-  --color-background-light: #f6f7f8;
-  --color-background-dark: #121c20;
   
   --font-inter: var(--font-inter), sans-serif;
   --font-roboto: var(--font-roboto), sans-serif;
 }
 
-:root {
-  --background: #ffffff;
-  --foreground: #1e293b;
+@theme {
+  --color-primary: #0B6E6D;
+  --color-gov-blue: #145369;
+  --color-gov-blue-dark: #0c3240;
+  
+  --font-inter: var(--font-inter), sans-serif;
+  --font-roboto: var(--font-roboto), sans-serif;
+}
 
-  /* Legacy / Compatibility Brand Colors */
-  --color-mcd-navy: #1e3a8a;
-  --color-mcd-slate: #475569;
-  --color-mcd-success: #16a34a;
-  --color-mcd-warning: #d97706;
-  --color-mcd-bg: #f8fafc;
+/* Force light mode base */
+html {
+  color-scheme: light !important;
+  scroll-behavior: smooth;
+  font-size: 16px;
+}
+
+@media (min-width: 768px) {
+  html {
+    font-size: 100%;
+  }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background-color: #ffffff !important;
+  color: #0f172a !important;
   font-family: var(--font-inter), sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  line-height: 1.5;
+  margin: 0;
 }
 
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
+/* 
+ * UI Stabilization: 
+ * Relying on body overrides and standard utility classes.
+ * Specificity issues resolved by removing redundant class overrides.
+ */
+
+h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-roboto), sans-serif;
+  letter-spacing: -0.02em;
 }
 
-/* Ensure contrast for brand colors */
-.text-mcd-navy {
-  color: var(--color-mcd-navy);
+/* High-contrast fixes for specific semantic elements */
+.text-slate-900 { color: #0f172a; }
+.text-slate-500 { color: #64748b; }
+
+/* Ensure icons and primary colors always pop against white bg */
+.text-gov-blue { color: #145369; }
+.bg-gov-blue { background-color: #145369; }
+
+@keyframes cursor {
+  0%, 100% { border-color: transparent; }
+  50% { border-color: #145369; }
 }
 
-.text-mcd-slate {
-  color: var(--color-mcd-slate);
-}
-
-.bg-mcd-navy {
-  background-color: var(--color-mcd-navy);
-}
-
-.bg-mcd-bg {
-  background-color: var(--color-mcd-bg);
-}
-
-.border-mcd-navy {
-  border-color: var(--color-mcd-navy);
-}
-
-.border-mcd-slate {
-  border-color: var(--color-mcd-slate);
+.animate-cursor {
+  animation: cursor 0.8s infinite;
 }

@@ -5,9 +5,12 @@ const nextConfig: NextConfig = {
   // Performance: Optimize resource loading and source maps
   productionBrowserSourceMaps: false,
   
-  // Experimental: Stabilize Turbopack & Enable Server Source Maps
+  // Experimental Features
   experimental: {
     serverSourceMaps: true,
+    serverActions: {
+      bodySizeLimit: '6mb',
+    },
   },
 
   // Explicitly signal Turbopack usage to resolve config conflicts

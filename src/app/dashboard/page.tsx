@@ -5,35 +5,39 @@ import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
 import Image from "next/image";
 import Link from "next/link";
-import {
-    Bell,
-    Search,
-    ChevronDown,
-    AlertCircle,
-    Clock,
-    Smile,
-    ExternalLink,
-    ChevronRight,
-    ChevronLeft,
-    RefreshCw,
-    ShieldAlert,
-    Sparkles,
-    LayoutGrid,
+import { 
+    Bell, 
+    Search, 
+    ChevronDown, 
+    AlertCircle, 
+    Clock, 
+    Smile, 
+    ExternalLink, 
+    ChevronRight, 
+    ChevronLeft, 
+    RefreshCw, 
+    ShieldAlert, 
+    Sparkles, 
+    LayoutDashboard, 
+    ClipboardList,
+    Map, 
+    Settings, 
+    Clock3, 
+    CheckCircle, 
+    LogOut,
+    TrendingUp, 
+    TrendingDown, 
+    MapPin, 
+    Mic, 
+    Volume2, 
+    User, 
+    FileDown, 
+    Menu, 
+    X,
+    Loader2 as LucideLoader,
     FileText,
-    Map as MapIcon,
-    Settings,
-    Clock3,
-    CheckCircle,
     XCircle,
-    TrendingUp,
-    TrendingDown,
-    MapPin,
-    Mic,
-    Volume2,
-    User,
-    FileDown,
-    Menu,
-    X
+    Plus
 } from "lucide-react";
 import { logoutAction } from "@/app/actions/auth";
 import { getServerProfileAction, UserProfile, updateUserProfileAction } from "@/app/actions/profile";
@@ -43,6 +47,7 @@ import { Complaint } from "@/lib/types";
 import { analyzeIssueAction, transcribeAudioAction, textToSpeechAction, generateDynamicVoiceSummaryAction } from "@/app/actions/ai";
 import { getGrievancesAction, createGrievanceAction } from "@/app/actions/grievance";
 import { generateGrievancePDF } from "@/lib/pdf";
+import BottomNav from "@/components/BottomNav";
 
 export default function CitizenDashboard() {
     const router = useRouter();
@@ -122,6 +127,22 @@ export default function CitizenDashboard() {
     const [lat, setLat] = useState<number | null>(null);
     const [lng, setLng] = useState<number | null>(null);
     const [currentAddress, setCurrentAddress] = useState<string | null>(null);
+    const [nearbyStats, setNearbyStats] = useState({
+        total: 0,
+        radius: 1.5 // km
+    });
+
+    const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+        const R = 6371; // km
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = 
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+    };
 
     const handleLocationTrack = () => {
         if ("geolocation" in navigator) {
@@ -236,6 +257,13 @@ export default function CitizenDashboard() {
                 
                 let finalProfile = result.profile;
 
+                // Safety: Redirect officials to authority portal if they hit this page
+                if (finalProfile?.role === 'authority') {
+                    console.log("[DASHBOARD_CLIENT] Authority user detected on Citizen Dashboard. Redirecting...");
+                    router.replace('/authority');
+                    return;
+                }
+
                 // NEW: Client-Side Recovery Fallback (Perfect for Localhost)
                 if (result.success && (!finalProfile || finalProfile.name.includes('Bridge'))) {
                     console.log("[DASHBOARD_CLIENT] Server missing deep session. Attempting Client-Side Recovery...");
@@ -338,6 +366,20 @@ export default function CitizenDashboard() {
         }
     }, [searchTerm, userProfile]);
 
+    useEffect(() => {
+        if (lat && lng && complaints.length > 0) {
+            const nearby = complaints.filter(c => {
+                if (!c.lat || !c.lng) return false;
+                const dist = getDistance(lat, lng, Number(c.lat), Number(c.lng));
+                return dist <= 1.5;
+            });
+            setNearbyStats({
+                total: nearby.length,
+                radius: 1.5
+            });
+        }
+    }, [lat, lng, complaints]);
+
     const handleUpdateProfile = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!userProfile) return;
@@ -384,7 +426,7 @@ export default function CitizenDashboard() {
         return (
             <div className="min-h-screen flex items-center justify-center bg-slate-50">
                 <div className="flex flex-col items-center gap-4">
-                    <Loader2 className="w-10 h-10 text-primary animate-spin" />
+                    <LucideLoader className="w-10 h-10 text-primary animate-spin" />
                     <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">Loading Your Citizen Dashboard...</p>
                 </div>
             </div>
@@ -428,9 +470,9 @@ export default function CitizenDashboard() {
                 </div>
 
                 <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-                    <SidebarLink icon={<LayoutGrid className="w-4 h-4" />} label="Overview" href="/dashboard" active />
-                    <SidebarLink icon={<FileText className="w-4 h-4" />} label="My Reports" href="/dashboard" />
-                    <SidebarLink icon={<MapIcon className="w-4 h-4" />} label="Local Map" href="/map" />
+                    <SidebarLink icon={<LayoutDashboard className="w-4 h-4" />} label="Overview" href="/dashboard" active />
+                    <SidebarLink icon={<ClipboardList className="w-4 h-4" />} label="My Reports" href="/dashboard" />
+                    <SidebarLink icon={<Map className="w-4 h-4" />} label="Local Map" href="/map" />
                     <SidebarLink icon={<ShieldAlert className="w-4 h-4" />} label="Emergency" href="/dashboard" />
                     
                     <div className="pt-8 pb-2 px-4 text-[10px] font-black text-slate-300 uppercase tracking-widest">Support</div>
@@ -441,21 +483,22 @@ export default function CitizenDashboard() {
                             onClick={handleLogout}
                             className="w-full flex items-center gap-4 px-4 py-3 rounded-2xl text-sm font-bold text-red-500 hover:bg-red-50 transition-all"
                         >
-                            <XCircle className="w-4 h-4 text-red-400" />
+                            <LogOut className="w-4 h-4 text-red-400" />
                             <span>Logout Session</span>
                         </button>
                     </div>
                 </nav>
 
                 <div className="p-4 border-t border-slate-50">
-                    <Link href="/report" className="w-full py-3 bg-gov-blue text-white text-xs font-black uppercase tracking-widest rounded-xl shadow-lg shadow-gov-blue/10 flex items-center justify-center gap-2">
-                        <span>+ New Report</span>
+                    <Link href="/report" className="w-full py-3 bg-gov-blue text-white text-xs font-black uppercase tracking-widest rounded-xl shadow-lg shadow-gov-blue/10 flex items-center justify-center gap-2 group transition-all active:scale-95">
+                        <Plus className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                        <span>New Report</span>
                     </Link>
                 </div>
             </aside>
 
             {/* Main Content */}
-            <main className="flex-1 lg:ml-64 p-4 md:p-8">
+            <main className="flex-1 lg:ml-64 p-4 md:p-8 pb-32 lg:pb-8">
                 {/* Header Section */}
                 <header className="flex items-center gap-2 md:gap-4 mb-6 md:mb-8 bg-white/50 backdrop-blur-md p-2 md:p-4 rounded-2xl md:rounded-3xl border border-white/50 shadow-sm sticky top-0 md:top-4 z-10 transition-all">
                     <button 
@@ -569,13 +612,14 @@ export default function CitizenDashboard() {
                                     onClick={() => setShowProfileMenu(!showProfileMenu)}
                                     className="w-10 h-10 rounded-xl overflow-hidden shadow-md cursor-pointer hover:ring-4 hover:ring-gov-blue/10 transition-all active:scale-95 relative"
                                 >
-                                    {userProfile?.profileImageUrl && userProfile.profileImageUrl.startsWith('http') ? (
+                                    {userProfile?.profileImageUrl ? (
                                         <Image 
-                                            src={userProfile.profileImageUrl} 
+                                            src={userProfile.profileImageUrl.startsWith('http') ? userProfile.profileImageUrl : `https://sgp.cloud.appwrite.io/v1/storage/buckets/profile-images/files/${userProfile.profileImageUrl}/view?project=civicos-app`}
                                             alt="User Avatar" 
                                             fill
                                             className="object-cover" 
                                             sizes="40px"
+                                            unoptimized={!userProfile.profileImageUrl.startsWith('http')}
                                         />
                                     ) : (
                                         <div className="w-full h-full bg-slate-200 flex items-center justify-center text-slate-400">
@@ -643,11 +687,11 @@ export default function CitizenDashboard() {
                         />
                         <MISStatCard 
                             title="Community" 
-                            value={stats.citizenSatisfaction} 
+                            value={lat && lng ? `${nearbyStats.total}` : "N/A"} 
                             trend="Local" 
                             trendUp={true} 
                             icon={<Smile className="text-orange-500 w-5 h-5" />} 
-                            subtitle="Ward Data"
+                            subtitle={`${nearbyStats.radius}km Ward Data`}
                         />
                         <MISStatCard 
                             title="Contributions" 
@@ -937,27 +981,9 @@ export default function CitizenDashboard() {
                     </div>
                 </div>
             )}
+            <BottomNav />
         </div>
     );
-}
-
-function Loader2(props: any) {
-    return (
-        <svg
-            {...props}
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        >
-            <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-        </svg>
-    )
 }
 
 function SidebarLink({ icon, label, href, active = false }: { icon: any, label: string, href: string, active?: boolean }) {
@@ -1115,7 +1141,7 @@ function MandatoryProfileUpdateModal({ userProfile, onComplete }: { userProfile:
                         disabled={isLoading}
                         className="w-full mt-6 py-4 bg-gov-blue text-white text-sm font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-gov-blue/20 hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                     >
-                        {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Save Profile Details"}
+                        {isLoading ? <LucideLoader className="w-5 h-5 animate-spin" /> : "Save Profile Details"}
                     </button>
                 </form>
             </div>

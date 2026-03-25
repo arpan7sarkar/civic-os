@@ -1,5 +1,6 @@
 "use client";
 
+import React, { useEffect, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -67,9 +68,17 @@ interface MapComponentProps {
 
 export default function MapComponent({ grievances, userLocation, onTrackTicketAction, onSelectComplaint }: MapComponentProps) {
     const defaultCenter: [number, number] = [28.6139, 77.2090]; // Delhi
+    const [isClient, setIsClient] = React.useState(false);
+
+    React.useEffect(() => {
+        setIsClient(true);
+    }, []);
+
+    if (!isClient) return null;
 
     return (
         <MapContainer 
+            key="civic-map-instance"
             center={userLocation || defaultCenter} 
             zoom={13} 
             className="w-full h-full z-0"
@@ -80,7 +89,6 @@ export default function MapComponent({ grievances, userLocation, onTrackTicketAc
                 url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
             />
             
-            {/* Default overlay hidden - using custom controls in page.tsx */}
             <MapSync center={userLocation} />
 
             {userLocation && (

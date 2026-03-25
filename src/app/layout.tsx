@@ -14,7 +14,7 @@ const roboto = Roboto({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://civic-os-five.vercel.app"),
+  metadataBase: new URL("https://civicos.systems/"),
   title: "CivicOS National | AI-Powered Public Infrastructure India",
   description: "The unified platform for National civic services. Report issues, track resolutions, and connect directly with government departments in real-time.",
   keywords: ["CivicOS", "National Public Infrastructure", "Government Services India", "Citizen Empowerment", "AI-Powered CRM"],
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "CivicOS National | Empowering Citizens, Building a Smarter India",
     description: "Official AI-Powered PS-CRM for India - Building a Smarter, Cleaner Country.",
-    url: "https://civic-os-five.vercel.app",
+    url: "https://civicos.systems/",
     siteName: "CivicOS National",
     locale: "en_IN",
     type: "website",
@@ -56,7 +56,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" data-scroll-behavior="smooth">
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />

@@ -39,7 +39,6 @@ export const Schemas = {
         update: z.object({
             name: z.string().min(2, "Name too short").max(100),
             email: z.string().email("Invalid email address").optional().or(z.literal("")),
-            bio: z.string().max(500).optional(),
             address: z.string().max(500).optional(),
         }),
     }

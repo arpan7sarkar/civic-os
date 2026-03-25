@@ -16,6 +16,7 @@ export interface UserProfile {
     profileImageUrl?: string;
     email?: string;
     address?: string;
+    role: 'citizen' | 'authority';
 }
 
 /**
@@ -33,20 +34,47 @@ export async function getServerProfileAction() {
         }
 
         // Real Session Fetch
-        const { account, tablesDB, databases } = createAppwriteClient(sessionSecret);
+        const { account, databases } = createAppwriteClient(sessionSecret);
         const user = await account.get();
         console.log(`[PROFILE_SERVER_V5] Authenticated User: ${user.name} (${user.$id})`);
         
+        // 1. HARDCODED ROLE for Official User (Bypass DB if needed)
+        if (user.email === 'bs922268@gmail.com') {
+            return JSON.parse(JSON.stringify({ 
+                success: true, 
+                isFullProfile: true, 
+                profile: {
+                    userId: user.$id,
+                    name: user.name || "Commissioner Bishal",
+                    email: user.email,
+                    role: 'authority',
+                    address: "Delhi Municipal HQ",
+                    govIdType: "PAN",
+                    govIdNumber: "OFFICIAL999",
+                    profileImageUrl: ""
+                }
+            }));
+        }
         try {
-            // Because legacy rows may have arbitrary Document IDs, query strictly by `userId` column
-            const profileList = await databases.listDocuments(
-                DATABASE_ID,
-                PROFILES_COLLECTION_ID,
-                [Query.equal('userId', user.$id), Query.limit(1)]
-            );
+            // 2. Fetch profile from collection (Direct ID Lookup first, then List)
+            let profileDoc;
+            try {
+                profileDoc = await databases.getDocument(DATABASE_ID, PROFILES_COLLECTION_ID, user.$id);
+                console.log(`[PROFILE_SERVER_V7] Direct ID lookup success for ${user.$id}.`);
+            } catch (e) {
+                console.log(`[PROFILE_SERVER_V7] Direct ID lookup failed for ${user.$id}, falling back to list query.`);
+                const profileList = await databases.listDocuments(
+                    DATABASE_ID,
+                    PROFILES_COLLECTION_ID,
+                    [Query.equal('userId', user.$id), Query.limit(1)]
+                );
+                if (profileList.documents.length > 0) {
+                    profileDoc = profileList.documents[0];
+                }
+            }
             
-            if (profileList.documents.length === 0) {
-                console.log(`[PROFILE_SERVER_V7] No legacy or modern profile rows found for user ${user.$id}.`);
+            if (!profileDoc) {
+                console.log(`[PROFILE_SERVER_V7] No profile document found for user ${user.$id}.`);
                 return JSON.parse(JSON.stringify({ 
                     success: true, 
                     isFullProfile: false, 
@@ -54,16 +82,26 @@ export async function getServerProfileAction() {
                 }));
             }
 
-            const doc = profileList.documents[0];
+            const doc = profileDoc;
             
+            // Construct profile image URL if only file ID is stored
+            let profileImageUrl = doc.profileImageUrl || '';
+            if (profileImageUrl && !profileImageUrl.startsWith('http')) {
+                const endpoint = env.APPWRITE_ENDPOINT || 'https://sgp.cloud.appwrite.io/v1';
+                const projectId = env.APPWRITE_PROJECT_ID || '';
+                profileImageUrl = `${endpoint}/storage/buckets/${PROFILE_IMAGES_BUCKET_ID}/files/${profileImageUrl}/view?project=${projectId}`;
+            }
+
             const profile: UserProfile = {
                 userId: doc.userId,
                 name: doc.name || user.name,
                 govIdType: doc.govIdType || 'Aadhaar',
                 govIdNumber: doc.govIdNumber || '',
-                profileImageUrl: doc.profileImageUrl || '',
+                profileImageUrl: profileImageUrl, // Use the constructed URL
                 email: user.email,
-                address: doc.address || ''
+                address: doc.address || '',
+                // Hardcoded role for the specific test user
+                role: (user.email === 'bs922268@gmail.com') ? 'authority' : (doc.role || 'citizen')
             };
             return JSON.parse(JSON.stringify({ 
                 success: true, 
@@ -120,7 +158,6 @@ export async function updateUserProfileAction(data: Partial<UserProfile>) {
         const safeProfile = {
             ...cleanData,
             name: sanitizeString(cleanData.name),
-            bio: sanitizeString(cleanData.bio || ""),
             address: sanitizeString(cleanData.address || ""),
         };
 
@@ -180,7 +217,14 @@ export async function createProfileWithImageAction(formData: FormData) {
         const safeName = sanitizeString(name);
         const safeGovIdNumber = sanitizeString(govIdNumber);
 
-        const profile: UserProfile = { userId, name: safeName, govIdType, govIdNumber: safeGovIdNumber, profileImageUrl };
+        const profile: UserProfile = { 
+            userId, 
+            name: safeName, 
+            govIdType, 
+            govIdNumber: safeGovIdNumber, 
+            profileImageUrl,
+            role: 'citizen' // Default to citizen on creation
+        };
         const result = await tablesDB.createRow({
             databaseId: DATABASE_ID,
             tableId: PROFILES_COLLECTION_ID,

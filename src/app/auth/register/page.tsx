@@ -20,30 +20,43 @@ export default function RegisterProfilePage() {
     const [error, setError] = useState('');
 
     useEffect(() => {
+        let mounted = true;
         let retries = 0;
         const maxRetries = 3;
 
         const checkAuth = async () => {
             const { success, user } = await getCurrentUserAction();
+            if (!mounted) return;
+
             if (success && user) {
                 setUserId(user.$id);
                 
                 // If user already has a valid name/profile, they shouldn't be here
+                const { isFullProfile } = await getServerProfileAction();
+                if (!mounted) return;
+
                 const isGlitchUser = !user.name || user.name.includes('Bridge');
-                if (!isGlitchUser) {
-                    console.log("[REGISTER] Profile already complete, redirecting to dashboard");
+                
+                if (isFullProfile && !isGlitchUser) {
+                    console.log("[REGISTER] Profile already complete in DB, redirecting to dashboard");
                     router.replace('/dashboard');
                 }
             } else if (retries < maxRetries) {
                 retries++;
                 console.log(`[REGISTER] Session not found, retry ${retries}/${maxRetries}...`);
-                setTimeout(checkAuth, 500); // Wait 500ms and try again
+                setTimeout(() => {
+                    if (mounted) checkAuth();
+                }, 500); // Wait 500ms and try again
             } else {
                 console.log("[REGISTER] Max retries reached, redirecting to /auth");
                 router.replace('/auth');
             }
         };
         checkAuth();
+
+        return () => {
+            mounted = false;
+        };
     }, [router]);
 
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {

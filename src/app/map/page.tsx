@@ -23,7 +23,7 @@ import {
     Loader2,
     Menu,
     X,
-    Map as MapIcon,
+    Map,
     Sparkles,
     CheckCircle,
     Clock3,
@@ -41,6 +41,7 @@ import MapSidebar from "@/components/map/MapSidebar";
 import MobileMapDrawer from "@/components/map/MobileMapDrawer";
 import MapInfoCard from "@/components/map/MapInfoCard";
 import { Complaint } from "@/lib/types";
+import BottomNav from "@/components/BottomNav";
 
 // Dynamic import for Leaflet map to avoid SSR errors
 const MapComponent = dynamic(() => import("@/components/MapComponent"), { 
@@ -357,10 +358,9 @@ export default function MapPage() {
                     >
                         <Menu className="w-6 h-6" />
                     </button>
-
                     <Link href="/dashboard" className="hidden lg:flex items-center gap-3 group">
                         <div className="bg-gov-blue p-1.5 rounded-lg text-white group-hover:bg-blue-800 transition-colors">
-                            <MapIcon className="w-5 h-5 shadow-lg" />
+                            <Map className="w-5 h-5 shadow-lg" />
                         </div>
                         <div>
                             <h1 className="text-gov-blue text-sm md:text-lg font-black leading-tight tracking-tight">CivicOS Map</h1>
@@ -507,6 +507,7 @@ export default function MapPage() {
                 </main>
             </div>
             
+            <BottomNav />
             <style jsx global>{`
                 .leaflet-container {
                     background: #f8fafc !important;
@@ -536,24 +537,3 @@ export default function MapPage() {
     );
 }
 
-// Simple LogOut icon replacement since it was missing in original imports but I used it
-function LogOut(props: any) {
-  return (
-    <svg 
-      {...props} 
-      xmlns="http://www.w3.org/2000/svg" 
-      width="24" 
-      height="24" 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="2" 
-      strokeLinecap="round" 
-      strokeLinejoin="round"
-    >
-      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-      <polyline points="16 17 21 12 16 7" />
-      <line x1="21" y1="12" x2="9" y2="12" />
-    </svg>
-  );
-}

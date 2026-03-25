@@ -26,6 +26,7 @@ import { saveComplaint, getComplaints } from "@/lib/store";
 import { getServerProfileAction } from "@/app/actions/profile";
 import { ComplaintCategory, Priority } from "@/lib/types";
 import { generateGrievancePDF } from "@/lib/pdf";
+import BottomNav from "@/components/BottomNav";
 
 export default function ReportPage() {
     const router = useRouter();
@@ -295,7 +296,7 @@ export default function ReportPage() {
                 </div>
             </header>
 
-            <main className="pt-24 pb-12 px-6 max-w-2xl mx-auto">
+            <main className="pt-24 pb-32 px-6 max-w-2xl mx-auto">
                 {/* Progress Bar */}
                 <div className="flex gap-2 mb-10">
                     {[1, 2, 3].map((s) => (
@@ -511,6 +512,7 @@ export default function ReportPage() {
                     </div>
                 )}
             </main>
+            <BottomNav />
         </div>
     );
 }

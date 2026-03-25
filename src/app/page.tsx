@@ -5,13 +5,20 @@ import DepartmentGrid from "@/components/DepartmentGrid";
 import Footer from "@/components/Footer";
 import SeoData from "@/components/SeoData";
 
+import LiveActivityStrip from "@/components/LiveActivityStrip";
+import TrustBlock from "@/components/TrustBlock";
+import BottomNav from "@/components/BottomNav";
+
 export default function Home() {
   return (
     <main className="min-h-screen flex flex-col">
       <SeoData />
       <Header />
+      <LiveActivityStrip />
       <Hero />
+      <TrustBlock />
       <DepartmentGrid />
+      <BottomNav />
       
       {/* FAQ Section for AEO and GEO Optimization */}
       <section className="py-20 bg-white" id="faq">

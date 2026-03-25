@@ -25,8 +25,18 @@ export interface Complaint {
     ward: string;
     userId: string;
     citizenPhoto?: string;
-    repairPhoto?: string;
+    repairPhoto?: string; // Legacy field
     rawDescription?: string;
+
+    // Government-Grade Features
+    assignedDepartment?: string;
+    assignedAuto?: boolean;
+    slaDeadline?: string;
+    affectedUsersCount?: number;
+    resolvedAt?: string;
+    resolvedByName?: string;
+    resolvedByRole?: string;
+    afterImageUrl?: string;
 }
 
 export interface AnalysisResult {
