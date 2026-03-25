@@ -15,18 +15,25 @@ import {
     AlertCircle,
     FileText,
     Mic,
-    Square
+    Square,
+    Navigation
 } from "lucide-react";
 import { useRef } from "react";
 import Link from "next/link";
 import { analyzeIssueAction, transcribeAudioAction } from "@/app/actions/ai";
-import { reverseGeocodeAction } from "@/app/actions/geo";
+import { reverseGeocodeAction, getAutocompleteSuggestionsAction } from "@/app/actions/geo";
 import { uploadGrievanceImageAction, createGrievanceAction } from "@/app/actions/grievance";
 import { saveComplaint, getComplaints } from "@/lib/store";
 import { getServerProfileAction } from "@/app/actions/profile";
 import { ComplaintCategory, Priority } from "@/lib/types";
 import { generateGrievancePDF } from "@/lib/pdf";
 import BottomNav from "@/components/BottomNav";
+import dynamic from "next/dynamic";
+
+const MapComponent = dynamic(() => import("@/components/MapComponent"), { 
+    ssr: false,
+    loading: () => <div className="w-full h-full bg-slate-50 animate-pulse rounded-3xl flex items-center justify-center text-[10px] font-black text-slate-300 uppercase tracking-widest">Map Loading...</div>
+});
 
 export default function ReportPage() {
     const router = useRouter();
@@ -45,6 +52,13 @@ export default function ReportPage() {
     const [location, setLocation] = useState("");
     const [coords, setCoords] = useState({ lat: 0, lng: 0 });
     const [isDetecting, setIsDetecting] = useState(false);
+    
+    // Autocomplete State
+    const [suggestions, setSuggestions] = useState<any[]>([]);
+    const [isSearchingSuggestions, setIsSearchingSuggestions] = useState(false);
+    const [isLocationSelected, setIsLocationSelected] = useState(false);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+
     const [ticketId, setTicketId] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState("");
@@ -140,6 +154,7 @@ export default function ReportPage() {
 
     const detectLocation = () => {
         setIsDetecting(true);
+        setIsLocationSelected(false);
         if ("geolocation" in navigator) {
             navigator.geolocation.getCurrentPosition(
                 async (position) => {
@@ -150,26 +165,62 @@ export default function ReportPage() {
                         const res = await reverseGeocodeAction(latitude, longitude);
                         if (res.success && res.address) {
                             setLocation(res.address);
+                            setIsLocationSelected(true);
                         } else {
-                            setLocation(`Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)} (Coords only)`);
+                            setLocation(`Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`);
+                            setIsLocationSelected(true);
                         }
                     } catch (err) {
                         setLocation(`Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`);
+                        setIsLocationSelected(true);
                     } finally {
                         setIsDetecting(false);
                     }
                 },
                 (error) => {
                     console.error("GPS Error:", error);
-                    setLocation("Location Access Denied - Enter Manually");
+                    setLocation("");
                     setIsDetecting(false);
                 },
                 { enableHighAccuracy: true }
             );
         } else {
-            setLocation("Geolocation not supported by browser");
+            setLocation("Geolocation not supported");
             setIsDetecting(false);
         }
+    };
+
+    // Handle autocomplete fetching
+    useEffect(() => {
+        if (!location || location.length < 3 || isLocationSelected) {
+            setSuggestions([]);
+            return;
+        }
+
+        const timer = setTimeout(async () => {
+            setIsSearchingSuggestions(true);
+            try {
+                const res = await getAutocompleteSuggestionsAction(location);
+                if (res.success) {
+                    setSuggestions(res.suggestions);
+                    setShowSuggestions(true);
+                }
+            } catch (err) {
+                console.error("Autocomplete fetch failed:", err);
+            } finally {
+                setIsSearchingSuggestions(false);
+            }
+        }, 400);
+
+        return () => clearTimeout(timer);
+    }, [location, isLocationSelected]);
+
+    const handleSelectSuggestion = (suggestion: any) => {
+        setLocation(suggestion.formatted);
+        setCoords({ lat: suggestion.lat, lng: suggestion.lon });
+        setIsLocationSelected(true);
+        setSuggestions([]);
+        setShowSuggestions(false);
     };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -392,21 +443,80 @@ export default function ReportPage() {
                         <div className="space-y-6">
                             <div>
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-3">Location Details</label>
-                                <div className="flex flex-col sm:flex-row gap-3">
-                                    <input
-                                        type="text"
-                                        value={location}
-                                        onChange={(e) => setLocation(e.target.value)}
-                                        placeholder="Enter manual address or detect"
-                                        className="flex-1 px-5 py-4 bg-white border border-slate-100 rounded-2xl text-sm font-bold placeholder:text-slate-300 focus:ring-2 focus:ring-gov-blue/20 transition-all outline-none"
-                                    />
-                                    <button 
-                                        onClick={detectLocation}
-                                        className="py-4 px-6 bg-slate-900 text-white rounded-2xl transition-all hover:bg-slate-800 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest"
-                                    >
-                                        {isDetecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
-                                        {isDetecting ? "Detecting..." : "Detect"}
-                                    </button>
+                                <div className="flex flex-col gap-3 relative">
+                                    <div className="flex flex-col sm:flex-row gap-3">
+                                        <div className="flex-1 relative">
+                                            <input
+                                                type="text"
+                                                value={location}
+                                                onChange={(e) => {
+                                                    setLocation(e.target.value);
+                                                    setIsLocationSelected(false);
+                                                }}
+                                                onFocus={() => location.length >= 3 && setShowSuggestions(true)}
+                                                placeholder="Type address for suggestions..."
+                                                className={`w-full px-5 py-4 bg-white border ${isLocationSelected ? 'border-emerald-200 ring-2 ring-emerald-50' : 'border-slate-100'} rounded-2xl text-sm font-bold placeholder:text-slate-300 focus:ring-2 focus:ring-gov-blue/20 transition-all outline-none`}
+                                            />
+                                            {isSearchingSuggestions && (
+                                                <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                                                    <Loader2 className="w-4 h-4 text-gov-blue animate-spin" />
+                                                </div>
+                                            )}
+                                            {isLocationSelected && !isSearchingSuggestions && (
+                                                <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                                                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                                                </div>
+                                            )}
+                                        </div>
+                                        <button 
+                                            onClick={detectLocation}
+                                            className="py-4 px-6 bg-slate-900 text-white rounded-2xl transition-all hover:bg-slate-800 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest"
+                                        >
+                                            {isDetecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
+                                            {isDetecting ? "Detecting..." : "GPS Detect"}
+                                        </button>
+                                    </div>
+
+                                    {/* Suggestions Dropdown */}
+                                    {showSuggestions && suggestions.length > 0 && (
+                                        <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-100 rounded-2xl shadow-xl z-30 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                                            {suggestions.map((s, i) => (
+                                                <button
+                                                    key={i}
+                                                    onClick={() => handleSelectSuggestion(s)}
+                                                    className="w-full text-left px-5 py-4 hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0 flex items-start gap-3 group"
+                                                >
+                                                    <MapPin className="w-4 h-4 text-slate-300 group-hover:text-gov-blue mt-0.5 shrink-0" />
+                                                    <div>
+                                                        <p className="text-sm font-bold text-slate-700">{s.address || s.formatted.split(',')[0]}</p>
+                                                        <p className="text-[10px] font-medium text-slate-400 mt-0.5">{s.formatted}</p>
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {(!isLocationSelected && location.length > 0 && !isSearchingSuggestions && suggestions.length === 0) && (
+                                        <div className="mt-1 px-4 text-[10px] font-bold text-amber-600 uppercase tracking-widest flex items-center gap-1.5 line-clamp-1">
+                                            <AlertCircle className="w-3 h-3" />
+                                            Please select a valid location from suggestions
+                                        </div>
+                                    )}
+
+                                    {/* Map Preview */}
+                                    {isLocationSelected && (
+                                        <div className="mt-4 h-48 md:h-64 rounded-3xl overflow-hidden border border-slate-100 shadow-sm relative animate-in fade-in zoom-in-95 duration-500">
+                                            <MapComponent 
+                                                grievances={[]} 
+                                                userLocation={[coords.lat, coords.lng]} 
+                                                onTrackTicketAction={() => {}} 
+                                            />
+                                            <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-xl border border-white/50 shadow-sm z-10 text-[10px] font-black text-gov-blue uppercase tracking-widest flex items-center gap-1.5">
+                                                <Navigation className="w-3 h-3" />
+                                                Verified Position
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -458,10 +568,10 @@ export default function ReportPage() {
                             >
                                 Back
                             </button>
-                            <button
+                             <button
                                 onClick={handleSubmit}
-                                disabled={!location || isSubmitting}
-                                className={`flex-1 py-4 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-lg ${location ? 'bg-[#0EA5E9] text-white shadow-blue-200 hover:-translate-y-0.5 active:scale-95' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
+                                disabled={!isLocationSelected || isSubmitting}
+                                className={`flex-1 py-4 rounded-2xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-lg ${isLocationSelected ? 'bg-[#0EA5E9] text-white shadow-blue-200 hover:-translate-y-0.5 active:scale-95' : 'bg-slate-100 text-slate-400 cursor-not-allowed'}`}
                             >
                                 {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                                 {isSubmitting ? "Submitting..." : "Submit Grievance"}

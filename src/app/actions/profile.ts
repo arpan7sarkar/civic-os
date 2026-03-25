@@ -213,7 +213,12 @@ export async function createProfileWithImageAction(formData: FormData) {
             profileImageUrl = `${endpoint}/storage/buckets/${PROFILE_IMAGES_BUCKET_ID}/files/${upload.$id}/view?project=${projectId}`;
         }
 
-        // 1. Sanitize Basic Inputs
+        // 1. Validate Input Basic Logic
+        if (!/^\d{12}$/.test(govIdNumber)) {
+            return JSON.parse(JSON.stringify({ success: false, error: "ID Number must be exactly 12 digits." }));
+        }
+
+        // 2. Sanitize Basic Inputs
         const safeName = sanitizeString(name);
         const safeGovIdNumber = sanitizeString(govIdNumber);
 

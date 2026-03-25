@@ -40,6 +40,7 @@ export const Schemas = {
             name: z.string().min(2, "Name too short").max(100),
             email: z.string().email("Invalid email address").optional().or(z.literal("")),
             address: z.string().max(500).optional(),
+            govIdNumber: z.string().regex(/^\d{12}$/, "ID Number must be exactly 12 digits"),
         }),
     }
 };
