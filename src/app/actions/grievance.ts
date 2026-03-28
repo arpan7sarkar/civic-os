@@ -2,11 +2,12 @@
 
 import { createAppwriteClient, DATABASE_ID, GRIEVANCES_COLLECTION_ID, GRIEVANCE_IMAGES_BUCKET_ID, ID, getServerSession } from '@/lib/appwrite.server';
 import { Complaint } from '@/lib/types';
-import { Permission, Role } from 'node-appwrite';
+import { Permission, Role, Query } from 'node-appwrite';
 import { InputFile } from 'node-appwrite/file';
 import { unstable_cache } from 'next/cache';
 import { Schemas, sanitizeString } from "@/lib/security";
 import { standardLimiter, getClientIp } from "@/lib/ratelimit";
+import { verifyReport } from "@/lib/gemini";
 
 /**
  * Upload an image for a grievance
@@ -116,6 +117,40 @@ export async function createGrievanceAction(data: Partial<Complaint>) {
         const slaDeadline = new Date(now.getTime() + slaHours * 60 * 60 * 1000).toISOString();
         const affectedUsersCount = Math.floor(Math.random() * (impactMax - impactMin + 1)) + impactMin;
 
+        // --- AI Verification Layer ---
+        let authenticityScore = 0;
+        let isSpam = false;
+        let isDuplicate = false;
+        let aiAnalysis = "Basic report accepted.";
+        
+        try {
+            console.log(`[GRIEVANCE_ACTION] Calling Gemini Verification...`);
+            // Query for recent grievances overall to detect duplicates
+            const recentGrievances = await tablesDB.listRows({
+                databaseId: DATABASE_ID,
+                tableId: GRIEVANCES_COLLECTION_ID,
+                queries: [Query.orderDesc('createdAt'), Query.limit(10)]
+            });
+            const recentStr = recentGrievances.documents.map((d: any) => `Desc: ${d.description}, Ward: ${d.ward}`).join('\n');
+            
+            const verification = await verifyReport(safeDescription, attributes.category || 'Other', recentStr);
+            
+            authenticityScore = typeof verification.authenticityScore === 'number' ? verification.authenticityScore : 0;
+            isSpam = !!verification.isSpam;
+            isDuplicate = !!verification.isDuplicate;
+            aiAnalysis = verification.aiAnalysis || "Pending";
+            
+            console.log(`[GRIEVANCE_ACTION] Verification: Score ${authenticityScore}, Spam: ${isSpam}, Dup: ${isDuplicate}`);
+            
+            // If it's extreme spam, we could optionally block it:
+            // if (isSpam && authenticityScore < 20) {
+            //      return { success: false, error: "VALIDATION_ERROR", details: "Blocked by AI spam filter: " + aiAnalysis };
+            // }
+        } catch (vErr: any) {
+            console.warn(`[GRIEVANCE_ACTION] Verification skipped/failed:`, vErr.message);
+        }
+        // --- End AI Verification Layer ---
+
         const result = await tablesDB.createRow({
             databaseId: DATABASE_ID,
             tableId: GRIEVANCES_COLLECTION_ID,
@@ -131,7 +166,11 @@ export async function createGrievanceAction(data: Partial<Complaint>) {
                 slaDeadline,
                 assignedAuto: "true",
                 assignedDepartment: attributes.department || "General",
-                affectedUsersCount
+                affectedUsersCount,
+                authenticityScore,
+                isSpam,
+                isDuplicate,
+                aiAnalysis
             },
             permissions: [
                 Permission.read(Role.any()), // Public on map
@@ -158,8 +197,6 @@ export async function createGrievanceAction(data: Partial<Complaint>) {
         return { success: false, error: error.message || "DATABASE_ERROR" };
     }
 }
-
-import { Query } from 'appwrite';
 
 /**
  * Fetch all grievances for the map/dashboard
@@ -401,7 +438,11 @@ export async function syncGrievanceUserDetailsAction(userId: string, newName: st
 /**
  * Update the status of a grievance (Authority Only)
  */
-export async function updateGrievanceStatusAction(complaintId: string, newStatus: string, resolutionData?: { afterImageUrl?: string, note?: string }) {
+export async function updateGrievanceStatusAction(
+    complaintId: string, 
+    newStatus: string, 
+    resolutionData?: { afterImageUrl?: string, note?: string }
+) {
     try {
         const sessionSecret = await getServerSession();
         if (!sessionSecret) return { success: false, error: 'NO_SESSION' };
@@ -436,9 +477,13 @@ export async function updateGrievanceStatusAction(complaintId: string, newStatus
         if (newStatus === 'Resolved') {
             updateData.resolvedAt = new Date().toISOString();
             updateData.resolvedByName = user.name;
-            updateData.resolvedByRole = "Authorized Official"; // In real app, fetch from profile.role
+            updateData.resolvedByRole = "Authorized Official"; 
+            
             if (resolutionData?.afterImageUrl) {
                 updateData.afterImageUrl = resolutionData.afterImageUrl;
+            }
+            if (resolutionData?.note) {
+                updateData.aiAnalysis = resolutionData.note; // Temporarily overriding aiAnalysis to store the note to prevent schema crash
             }
             
             // Hyperlocal Loop Simulation
@@ -459,6 +504,57 @@ export async function updateGrievanceStatusAction(complaintId: string, newStatus
         return { success: false, error: error.message };
     }
 }
+
+/**
+ * Fetch recently resolved grievances near a location for hyperlocal notifications
+ */
+export async function getHyperlocalResolutionsAction(lat: number, lng: number, radiusKm: number = 2.0) {
+    try {
+        const sessionSecret = await getServerSession();
+        if (!sessionSecret) return { success: false, error: 'NO_SESSION' };
+        
+        const { databases } = createAppwriteClient(sessionSecret);
+
+        // Fetch latest resolved docs
+        const response = await databases.listDocuments({
+            databaseId: DATABASE_ID,
+            collectionId: GRIEVANCES_COLLECTION_ID,
+            queries: [
+                Query.equal('status', 'Resolved'),
+                Query.orderDesc('resolvedAt'),
+                Query.limit(20)
+            ]
+        });
+
+        const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+            const R = 6371; // km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = 
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        };
+
+        const nearbyResolved = response.documents.filter((doc: any) => {
+            if (!doc.lat || !doc.lng) return false;
+            const dist = getDistance(lat, lng, Number(doc.lat), Number(doc.lng));
+            return dist <= radiusKm;
+        }).map((doc: any) => ({
+            ...doc,
+            id: doc.$id
+        }));
+
+        return JSON.parse(JSON.stringify({ success: true, resolutions: nearbyResolved }));
+    } catch (error: any) {
+        console.error("Hyperlocal Resolutions Error:", error);
+        return { success: false, error: error.message };
+    }
+}
+
+
 /**
  * Cached helper for live activity to protect Appwrite limits and improve performance.
  * Shared across all users for 60 seconds.

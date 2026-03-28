@@ -18,6 +18,11 @@ export const Schemas = {
     // Authentication
     auth: {
         phone: z.string().regex(/^\+?[1-9]\d{1,14}$|^[6-9]\d{9}$/, "Invalid phone number format"),
+        phoneOrEmail: z.string().refine((val) => {
+            const isPhone = /^\+?[1-9]\d{1,14}$|^[6-9]\d{9}$/.test(val);
+            const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+            return isPhone || isEmail;
+        }, "Please enter a valid 10-digit mobile or email address"),
         otp: z.string().length(6, "OTP must be exactly 6 digits"),
         userId: z.string().min(1, "User ID is required"),
     },
@@ -40,6 +45,7 @@ export const Schemas = {
             name: z.string().min(2, "Name too short").max(100),
             email: z.string().email("Invalid email address").optional().or(z.literal("")),
             address: z.string().max(500).optional(),
+            govIdNumber: z.string().regex(/^\d{12}$/, "ID Number must be exactly 12 digits"),
         }),
     }
 };

@@ -89,6 +89,17 @@ export default function ReportPage() {
     const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
     const [isTranscribing, setIsTranscribing] = useState(false);
 
+    // Camera Live Capture State
+    const [isCameraActive, setIsCameraActive] = useState(false);
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const [stream, setStream] = useState<MediaStream | null>(null);
+
+    // Bind stream to video element when it becomes available
+    useEffect(() => {
+        if (isCameraActive && videoRef.current && stream) {
+            videoRef.current.srcObject = stream;
+        }
+    }, [isCameraActive, stream]);
 
     useEffect(() => {
         getServerProfileAction().then(result => {
@@ -450,6 +461,55 @@ export default function ReportPage() {
         const finalUserId = overrides.userId ?? userId;
 
         if (!finalUserId || !finalAiResult) return;
+    const startCamera = async () => {
+        try {
+            const mediaStream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: "environment" }, 
+                audio: false 
+            });
+            setStream(mediaStream);
+            setIsCameraActive(true);
+            // videoRef binding is now handled by useEffect below
+        } catch (err) {
+            console.error("Camera access denied:", err);
+            alert("Camera access denied. Please check permissions.");
+        }
+    };
+
+    const stopCamera = () => {
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+            setStream(null);
+        }
+        setIsCameraActive(false);
+    };
+
+    const capturePhoto = () => {
+        if (videoRef.current) {
+            const canvas = document.createElement("canvas");
+            canvas.width = videoRef.current.videoWidth;
+            canvas.height = videoRef.current.videoHeight;
+            const ctx = canvas.getContext("2d");
+            if (ctx) {
+                ctx.drawImage(videoRef.current, 0, 0);
+                const dataUrl = canvas.toDataURL("image/jpeg");
+                setImagePreview(dataUrl);
+                
+                // Convert to File object
+                fetch(dataUrl)
+                    .then(res => res.blob())
+                    .then(blob => {
+                        const file = new File([blob], "capture.jpg", { type: "image/jpeg" });
+                        setSelectedFile(file);
+                    });
+                
+                stopCamera();
+            }
+        }
+    };
+
+    const handleSubmit = async () => {
+        if (!userId || !aiResult) return;
         setIsSubmitting(true);
         
         let photoId = "";
@@ -803,42 +863,87 @@ export default function ReportPage() {
 
                             <div>
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-3">Photo Evidence (Optional)</label>
-                                <input 
-                                    type="file" 
-                                    accept="image/*" 
-                                    onChange={handleFileChange}
-                                    className="hidden" 
-                                    id="photo-upload"
-                                />
-                                <label 
-                                    htmlFor="photo-upload"
-                                    className="border-2 border-dashed border-slate-200 rounded-3xl p-10 flex flex-col items-center justify-center gap-4 bg-white/50 hover:bg-white hover:border-gov-blue/30 transition-all cursor-pointer overflow-hidden group"
-                                >
-                                    {imagePreview ? (
-                                        <div className="relative w-full aspect-video rounded-2xl overflow-hidden border border-slate-100">
-                                            <Image 
-                                                src={imagePreview} 
-                                                alt="Preview" 
-                                                fill
-                                                className="object-cover" 
-                                                sizes="(max-width: 672px) 100vw, 672px"
-                                            />
-                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-black uppercase tracking-widest z-10">
-                                                Change Photo
-                                            </div>
+                                
+                                {isCameraActive ? (
+                                    <div className="relative rounded-3xl overflow-hidden bg-black border border-slate-800 shadow-2xl animate-in zoom-in-95 duration-300">
+                                        <video 
+                                            ref={videoRef} 
+                                            autoPlay 
+                                            playsInline 
+                                            muted
+                                            className="w-full aspect-video object-cover"
+                                        />
+                                        <div className="absolute bottom-6 inset-x-0 flex justify-center gap-4 px-6">
+                                            <button 
+                                                onClick={stopCamera}
+                                                className="px-6 py-3 bg-white/20 backdrop-blur-md text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-white/30 transition-all border border-white/10"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button 
+                                                onClick={capturePhoto}
+                                                className="px-8 py-3 bg-white text-slate-900 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-100 transition-all shadow-xl flex items-center gap-2"
+                                            >
+                                                <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
+                                                Capture Photo
+                                            </button>
                                         </div>
-                                    ) : (
-                                        <>
-                                            <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center text-slate-400 group-hover:text-gov-blue transition-colors">
-                                                <Camera className="w-6 h-6" />
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <button 
+                                                onClick={startCamera}
+                                                className="p-6 bg-gov-blue/5 border border-gov-blue/10 rounded-3xl flex flex-col items-center justify-center gap-3 hover:bg-gov-blue/10 transition-all group"
+                                            >
+                                                <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-gov-blue shadow-sm group-hover:scale-110 transition-transform">
+                                                    <Camera className="w-5 h-5" />
+                                                </div>
+                                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">Open Camera</span>
+                                            </button>
+                                            
+                                            <input 
+                                                type="file" 
+                                                accept="image/*" 
+                                                onChange={handleFileChange}
+                                                className="hidden" 
+                                                id="photo-upload"
+                                            />
+                                            <label 
+                                                htmlFor="photo-upload"
+                                                className="p-6 bg-slate-50 border border-slate-100 rounded-3xl flex flex-col items-center justify-center gap-3 hover:bg-slate-100 transition-all cursor-pointer group"
+                                            >
+                                                <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-slate-400 shadow-sm group-hover:scale-110 transition-transform">
+                                                    <Upload className="w-5 h-5" />
+                                                </div>
+                                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Upload File</span>
+                                            </label>
+                                        </div>
+
+                                        {imagePreview && (
+                                            <div className="relative aspect-video rounded-3xl overflow-hidden border border-slate-100 shadow-sm group">
+                                                <Image 
+                                                    src={imagePreview} 
+                                                    alt="Preview" 
+                                                    fill
+                                                    className="object-cover" 
+                                                    sizes="(max-width: 672px) 100vw, 672px"
+                                                />
+                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
+                                                    <button 
+                                                        onClick={() => {
+                                                            setImagePreview(null);
+                                                            setSelectedFile(null);
+                                                        }}
+                                                        className="px-4 py-2 bg-white/20 backdrop-blur-md text-white border border-white/20 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-500 transition-colors"
+                                                    >
+                                                        Remove
+                                                    </button>
+                                                </div>
                                             </div>
-                                            <div className="text-center">
-                                                <p className="text-sm font-bold text-slate-600">Upload Photo of the Issue</p>
-                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">PNG, JPG up to 10MB</p>
-                                            </div>
-                                        </>
-                                    )}
-                                </label>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
 

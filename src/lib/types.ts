@@ -37,7 +37,9 @@ export interface Complaint {
     resolvedByName?: string;
     resolvedByRole?: string;
     afterImageUrl?: string;
+    resolutionNote?: string;
 }
+
 
 export interface AnalysisResult {
     category: ComplaintCategory;

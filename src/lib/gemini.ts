@@ -247,6 +247,79 @@ export async function parseVoiceTurn(input: VoiceTurnInput): Promise<VoiceTurnOu
             nextPrompt: "I'm sorry, I didn't quite catch that. Could you repeat?",
             intents: ["unknown"],
             confidence: 0,
+
+/**
+ * AI Verification Layer for Civic Issues
+ * Validates authenticity, checks for spam and potential duplicates.
+ */
+export async function verifyReport(description: string, category: string, recentReportsStr: string) {
+    if (!GEMINI_API_KEY) {
+        return {
+            authenticityScore: 50,
+            isSpam: false,
+            isDuplicate: false,
+            aiAnalysis: "Verification skipped (API Key Missing)."
+        };
+    }
+
+    const tryVerify = async (modelName: string) => {
+        const model = genAI.getGenerativeModel({ model: modelName });
+        const safeInput = shieldPrompt(description);
+        const prompt = `
+        You are the 'CivicOS Verification Engine'.
+        Your job is to analyze a new civic issue report and determine its authenticity, whether it is spam, and if it's a duplicate of recently reported issues.
+
+        New Report:
+        Description: ${safeInput}
+        Category: ${category}
+
+        Recent Reports in the same area:
+        ${recentReportsStr || 'None'}
+
+        Examine the new report carefully. 
+        - Is it gibberish, offensive, or clearly not a civic issue? (isSpam = true, authenticityScore < 30)
+        - Does it exactly match or closely describe the same specific issue in the recent reports? (isDuplicate = true)
+        - Provide an authenticity score from 0 to 100 based on detail level, realism, and civic relevance.
+
+        Provide a JSON response strictly in this format:
+        {
+            "authenticityScore": number,
+            "isSpam": boolean,
+            "isDuplicate": boolean,
+            "aiAnalysis": "Short 1-2 sentence explanation of your scoring and flags"
+        }
+        `;
+
+        const generateWithTimeout = async () => {
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error("Gemini Request Timed Out")), 10000);
+            });
+
+            const contentPromise = model.generateContent(prompt);
+            return Promise.race([contentPromise, timeoutPromise]) as Promise<any>;
+        };
+
+        const result = await generateWithTimeout();
+        const response = result.response; 
+        const text = response.text();
+        const jsonStr = text.replace(/```json|```/g, "").trim();
+        return JSON.parse(jsonStr);
+    };
+
+    try {
+        return await tryVerify(GEMINI_MODELS.primary);
+    } catch (error) {
+        // Fallback for Rate Limits
+        const isRateLimit = (error as any)?.status === 429 || (error as any)?.message?.includes('429');
+        if (isRateLimit) {
+            try { return await tryVerify(GEMINI_MODELS.secondary); } catch(e) {}
+        }
+        console.error("[GEMINI] Verify Error:", error);
+        return {
+            authenticityScore: 70,
+            isSpam: false,
+            isDuplicate: false,
+            aiAnalysis: "Fallback verification due to latency or error."
         };
     }
 }

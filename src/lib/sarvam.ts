@@ -28,9 +28,10 @@ export async function transcribeAudio(base64Audio: string) {
 
                 const callPromise = sarvamClient.speechToText.transcribe({
                     file: buffer as any,
-                    model: "saaras:v3",
-                    mode: "transcribe"
-                });
+                    model: "saaras:v1", // Explicitly use v1 which has the widest language auto-detect support
+                    languageCode: "Unknown", // Supports all native languages detection
+                    withDiacritics: true
+                } as any);
 
                 response = await Promise.race([callPromise, timeoutPromise]);
                 break; // Success
@@ -40,8 +41,11 @@ export async function transcribeAudio(base64Audio: string) {
                 await new Promise(r => setTimeout(r, 1000 * attempt));
             }
         }
-        return response;
-        return response;
+        
+        console.log("[SARVAM_STT] Raw Response:", JSON.stringify(response).slice(0, 100) + '...');
+        // Correctly extract the actual transcript from the Sarvam response
+        const transcriptText = (response as any)?.transcript || (response as any)?.text || (response as any)?.data || String(response);
+        return { transcript: transcriptText };
     } catch (error) {
         console.error("Sarvam STT Error:", error);
         throw error;

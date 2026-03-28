@@ -39,7 +39,12 @@ export const env = {
     GRIEVANCE_IMAGES_BUCKET_ID: (typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_APPWRITE_GRIEVANCE_IMAGES_BUCKET_ID : (process.env.NEXT_PUBLIC_APPWRITE_GRIEVANCE_IMAGES_BUCKET_ID || process.env.APPWRITE_GRIEVANCE_IMAGES_BUCKET_ID)) || '69b563e9002ced5d5f63',
     
     // Node Env
-    IS_PROD: process.env.NODE_ENV === 'production'
+    IS_PROD: process.env.NODE_ENV === 'production',
+
+    // Security (Server Only)
+    // Used to bypass rate limits and CORS during development (Dev Key) 
+    // or for full administrative access (API Key)
+    APPWRITE_API_KEY: process.env.APPWRITE_API_KEY || ''
 };
 
 if (typeof window === 'undefined') {
