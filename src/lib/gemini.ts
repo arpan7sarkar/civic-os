@@ -3,6 +3,8 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 
 import { env } from "./env";
 import { sanitizeString, shieldPrompt } from "./security";
+import { VoiceTurnInput, VoiceTurnOutput, getMissingRequiredFields } from "./voice";
+
 const GEMINI_API_KEY = env.GEMINI_API_KEY;
 const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
 
@@ -137,5 +139,114 @@ export async function generateVoiceSummary(complaints: any[], userName: string) 
     } catch (error) {
         console.error("[GEMINI] Voice Summary Error:", error);
         return `नमस्ते ${userName}। आपके पास ${complaints.length} शिकायतें हैं, जिनमें से ${complaints.filter((c: any) => c.status === 'Pending').length} लंबित हैं।`;
+    }
+}
+/**
+ * Multi-turn voice autopilot parser using Gemini.
+ * Extracts draft fields and identifies user intents.
+ */
+export async function parseVoiceTurn(input: VoiceTurnInput): Promise<VoiceTurnOutput> {
+    const { transcript, currentDraft } = input;
+    
+    if (!GEMINI_API_KEY) {
+        return {
+            draftPatch: {},
+            missingFields: ["description", "category", "location"],
+            nextPrompt: "I'm having trouble connecting to my brain. Please try again later.",
+            intents: ["unknown"],
+            confidence: 0,
+        };
+    }
+
+    const tryParse = async (modelName: string) => {
+        const model = genAI.getGenerativeModel({ 
+            model: modelName,
+            generationConfig: { responseMimeType: "application/json" }
+        });
+        
+        const safeTranscript = shieldPrompt(transcript);
+        const currentDraftStr = JSON.stringify(currentDraft);
+
+        const prompt = `
+        You are 'CivicOS Autopilot Parser'. 
+        Your job is to parse a citizen's spoken input and update a civic report draft.
+
+        Current Draft State:
+        ${currentDraftStr}
+
+        New Utterance:
+        <START_USER_DATA>
+        ${safeTranscript}
+        <END_USER_DATA>
+
+        Tasks:
+        1. Extract information for these fields IF provided: description, category, priority, department, locationText.
+        2. Identify user intents from: provide_info, correct_info, request_gps, confirm_submit, cancel, repeat.
+        3. Detect if the user wants to use GPS (request_gps) or explicitly wants to submit (confirm_submit).
+        4. Generate a polite conversational next prompt in the language of the user (Hindi/English/Hinglish).
+        
+        Rules:
+        - If the user provides a category, map it to: Streetlight, Garbage, Water Leakage, Road Damage, Encroachment, Illegal Parking, Other.
+        - If the user provides priority, map to: Critical, High, Medium, Low.
+        - 'draftPatch' should only contain fields found in this utterance.
+        - If the user says "use my current location" or similar, set 'wantsGps' to true in draftPatch.
+        - If the user confirms submission, set 'wantsSubmit' to true in draftPatch.
+        
+        Prompting Strategy:
+        - If missing description: Ask "Please describe the issue in detail." (or Hindi equivalent).
+        - If missing category: Ask "What category does this fall under?" (or Hindi equivalent).
+        - If missing location: Ask "Where is this issue located? You can say the address or ask me to use your GPS."
+        - If all fields present: Ask "Everything looks ready. Should I submit this report now?"
+
+        Return JSON exactly matching this schema:
+        {
+          "draftPatch": { "description": string, "category": string, "priority": string, "department": string, "locationText": string, "wantsGps": boolean, "wantsSubmit": boolean },
+          "intents": string[],
+          "confidence": number,
+          "nextPrompt": string
+        }
+        `;
+
+        const result = await model.generateContent(prompt);
+        const response = result.response;
+        const text = response.text();
+        const cleanJson = text.replace(/```json|```/g, "").trim();
+        return JSON.parse(cleanJson);
+    };
+
+    try {
+        const result = await tryParse(GEMINI_MODELS.primary);
+        
+        // Calculate missing fields accurately using the utility
+        const combinedDraft = { ...currentDraft, ...result.draftPatch };
+        const missingFields = getMissingRequiredFields(combinedDraft);
+
+        return {
+            draftPatch: result.draftPatch,
+            missingFields: missingFields,
+            nextPrompt: result.nextPrompt,
+            intents: result.intents,
+            confidence: result.confidence
+        };
+    } catch (error: any) {
+        console.error("[GEMINI] Voice Turn Parse Error:", error);
+        
+        // Fallback for Rate Limits
+        const isRateLimit = error.status === 429 || error.message?.includes('429');
+        if (isRateLimit) {
+            try {
+                return await tryParse(GEMINI_MODELS.secondary);
+            } catch (fallbackError) {
+                console.error("[GEMINI] Fallback Voice Parse Error:", fallbackError);
+            }
+        }
+
+        return {
+            draftPatch: {},
+            missingFields: [],
+            nextPrompt: "I'm sorry, I didn't quite catch that. Could you repeat?",
+            intents: ["unknown"],
+            confidence: 0,
+        };
     }
 }
