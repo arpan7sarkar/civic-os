@@ -30,10 +30,10 @@ interface AdminSidebarProps {
 
 const adminNavigation = [
     { name: 'Operational Control', href: '/authority', icon: LayoutDashboard },
-    { name: 'Ward Analytics', href: '#', icon: Zap },
-    { name: 'Official Circulars', href: '#', icon: FileText },
-    { name: 'Departmental Reports', href: '#', icon: Users },
-    { name: 'System Settings', href: '#', icon: Settings },
+    { name: 'Ward Analytics', href: '/authority/ward-analytics', icon: Zap },
+    { name: 'Official Circulars', href: '/authority/circulars', icon: FileText },
+    { name: 'Departmental Reports', href: '/authority/reports', icon: Users },
+    { name: 'System Settings', href: '/authority/settings', icon: Settings },
 ];
 
 export default function AdminSidebar({ userProfile, onLogoutAction, isOpen, onClose }: AdminSidebarProps) {
@@ -81,15 +81,6 @@ export default function AdminSidebar({ userProfile, onLogoutAction, isOpen, onCl
                         </Link>
                     );
                 })}
-                
-                <div className="pt-8 pb-2 px-4 text-[10px] font-black text-slate-300 uppercase tracking-widest">Portal Switching</div>
-                <Link
-                    href="/dashboard"
-                    className="flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-bold text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition-all"
-                >
-                    <ArrowLeft className="w-4 h-4 text-slate-400" />
-                    <span>Citizen Perspective</span>
-                </Link>
 
                 <div className="pt-4 mt-auto">
                     <button 

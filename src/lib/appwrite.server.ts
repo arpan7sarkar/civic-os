@@ -40,8 +40,13 @@ export function createAppwriteClient(sessionSecret?: string) {
         .setEndpoint(env.APPWRITE_ENDPOINT || 'https://sgp.cloud.appwrite.io/v1')
         .setProject(PROJECT_ID);
 
+    // If a sessionSecret is provided, act as the USER (don't set the server key)
     if (sessionSecret) {
         client.setSession(sessionSecret);
+    } 
+    // Otherwise, if an API Key is available, use it for administrative/public actions
+    else if (env.APPWRITE_API_KEY) {
+        client.setKey(env.APPWRITE_API_KEY);
     }
 
     const databases = new Databases(client);

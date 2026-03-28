@@ -78,6 +78,13 @@ export default function ReportPage() {
     const videoRef = useRef<HTMLVideoElement>(null);
     const [stream, setStream] = useState<MediaStream | null>(null);
 
+    // Bind stream to video element when it becomes available
+    useEffect(() => {
+        if (isCameraActive && videoRef.current && stream) {
+            videoRef.current.srcObject = stream;
+        }
+    }, [isCameraActive, stream]);
+
     useEffect(() => {
         getServerProfileAction().then(result => {
             if (result.success && result.profile) {
@@ -248,9 +255,7 @@ export default function ReportPage() {
             });
             setStream(mediaStream);
             setIsCameraActive(true);
-            if (videoRef.current) {
-                videoRef.current.srcObject = mediaStream;
-            }
+            // videoRef binding is now handled by useEffect below
         } catch (err) {
             console.error("Camera access denied:", err);
             alert("Camera access denied. Please check permissions.");
@@ -583,6 +588,7 @@ export default function ReportPage() {
                                             ref={videoRef} 
                                             autoPlay 
                                             playsInline 
+                                            muted
                                             className="w-full aspect-video object-cover"
                                         />
                                         <div className="absolute bottom-6 inset-x-0 flex justify-center gap-4 px-6">

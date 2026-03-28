@@ -64,6 +64,7 @@ export default function AuthorityDashboard() {
     const [resolutionNote, setResolutionNote] = useState("");
     const [showCircularModal, setShowCircularModal] = useState(false);
     const [currentRegion, setCurrentRegion] = useState("Delhi NCT Administrative Region");
+    const [liveAddress, setLiveAddress] = useState("the reported area");
 
     // Notification State
     const [notifications, setNotifications] = useState([
@@ -518,6 +519,18 @@ export default function AuthorityDashboard() {
                                                     setSelectedComplaint(item);
                                                     setNewStatus(item.status);
                                                     setShowStatusModal(true);
+                                                    setLiveAddress("fetching location...");
+                                                    import("@/app/actions/geo").then((geo) => {
+                                                        geo.reverseGeocodeAction(item.lat, item.lng).then(res => {
+                                                            if (res.success && res.address) {
+                                                                const parts = res.address.split(',');
+                                                                const shortAddress = parts.slice(0, 2).join(',').trim();
+                                                                setLiveAddress(shortAddress || res.address);
+                                                            } else {
+                                                                setLiveAddress(`coordinates (${item.lat.toFixed(4)}, ${item.lng.toFixed(4)})`);
+                                                            }
+                                                        });
+                                                    });
                                                 }}
                                                 className="w-12 h-12 bg-white border border-slate-100 rounded-full flex items-center justify-center text-gov-blue hover:bg-gov-blue hover:text-white hover:scale-110 transition-all shadow-sm group-hover:shadow-lg"
                                             >
@@ -534,11 +547,11 @@ export default function AuthorityDashboard() {
 
             {/* Status Update Modal */}
             {showStatusModal && selectedComplaint && (
-                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[100] flex items-center justify-center p-4 overflow-y-auto">
-                    <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-xl my-auto animate-in zoom-in-95 duration-300 border border-white overflow-hidden relative">
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[100] flex items-end sm:items-center justify-center p-4 sm:p-6 sm:overflow-y-auto">
+                    <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-xl animate-in slide-in-from-bottom-5 sm:zoom-in-95 duration-300 border border-white overflow-hidden relative flex flex-col max-h-[90vh] sm:max-h-[85vh]">
                         {/* High-Fidelity Processing Overlay */}
                         {isActionLoading && (
-                            <div className="absolute inset-0 bg-white/60 backdrop-blur-md z-[110] flex flex-col items-center justify-center gap-6 animate-in fade-in duration-500">
+                            <div className="absolute inset-0 bg-white/80 backdrop-blur-md z-[110] flex flex-col items-center justify-center gap-6 animate-in fade-in duration-500">
                                 <div className="relative">
                                     <div className="w-20 h-20 border-4 border-gov-blue/10 rounded-full" />
                                     <div className="absolute inset-x-0 inset-y-0 border-4 border-t-gov-blue rounded-full animate-spin" />
@@ -546,12 +559,12 @@ export default function AuthorityDashboard() {
                                 </div>
                                 <div className="text-center">
                                     <h4 className="text-lg font-black text-slate-800 uppercase tracking-tight mb-1">Finalizing Resolution</h4>
-                                    <p className="text-[11px] text-slate-400 font-bold uppercase tracking-[0.2em] animate-pulse">Synchronizing with Citizen Logs...</p>
+                                    <p className="text-[11px] text-slate-400 font-bold uppercase tracking-[0.2em] animate-pulse">Synchronizing with system...</p>
                                 </div>
                             </div>
                         )}
 
-                        <div className="p-8 space-y-8">
+                        <div className="p-6 sm:p-8 space-y-6 sm:space-y-8 overflow-y-auto custom-scrollbar">
                             <div className="flex justify-between items-start">
                                 <div>
                                     <h3 className="text-2xl font-black text-slate-800 leading-tight">Grievance Resolution</h3>
@@ -560,30 +573,30 @@ export default function AuthorityDashboard() {
                                         <p className="text-[11px] font-black text-gov-blue uppercase tracking-widest">Ticket #{selectedComplaint.id.toUpperCase()}</p>
                                     </div>
                                 </div>
-                                <button onClick={() => {setShowStatusModal(false); setAfterImage(null); setImagePreview(null);}} className="p-2.5 hover:bg-slate-50 rounded-xl text-slate-400 transition-colors">
+                                <button onClick={() => {setShowStatusModal(false); setAfterImage(null); setImagePreview(null);}} className="p-2.5 hover:bg-slate-50 rounded-xl text-slate-400 transition-colors shrink-0">
                                     <X size={22} />
                                 </button>
                             </div>
 
                             <div className="space-y-4">
                                 <label className="block text-[10px] text-slate-400 font-black uppercase tracking-widest px-2">Operational Stage</label>
-                                <div className="grid grid-cols-3 gap-3">
+                                <div className="grid grid-cols-3 gap-2 sm:gap-3">
                                     {[
-                                        { s: 'Pending', i: <Clock3 size={20}/> },
-                                        { s: 'In Progress', i: <Activity size={20}/> },
-                                        { s: 'Resolved', i: <CheckCircle size={20}/> }
+                                        { s: 'Pending', i: <Clock3 size={18} className="sm:w-5 sm:h-5"/> },
+                                        { s: 'In Progress', i: <Activity size={18} className="sm:w-5 sm:h-5"/> },
+                                        { s: 'Resolved', i: <CheckCircle size={18} className="sm:w-5 sm:h-5"/> }
                                     ].map((stage) => (
                                         <button 
                                             key={stage.s}
                                             onClick={() => setNewStatus(stage.s)}
-                                            className={`p-5 rounded-2xl border-2 transition-all flex flex-col items-center gap-2.5 ${
+                                            className={`p-3 sm:p-5 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${
                                                 newStatus === stage.s 
                                                 ? 'bg-gov-blue/5 border-gov-blue text-gov-blue shadow-[inset_0_2px_10px_rgba(0,0,0,0.05)]' 
                                                 : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200 hover:text-slate-600'
                                             }`}
                                         >
                                             {stage.i}
-                                            <span className="text-[10px] font-black uppercase tracking-tight">{stage.s}</span>
+                                            <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-tight text-center">{stage.s}</span>
                                         </button>
                                     ))}
                                 </div>
@@ -611,21 +624,21 @@ export default function AuthorityDashboard() {
                                                 }}
                                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                                             />
-                                            <div className={`h-40 rounded-2xl border-2 border-dashed transition-all flex flex-col items-center justify-center p-6 ${
+                                            <div className={`h-32 sm:h-40 rounded-2xl border-2 border-dashed transition-all flex flex-col items-center justify-center p-4 sm:p-6 ${
                                                 imagePreview ? 'border-emerald-600/30' : 'border-slate-100 group-hover:border-gov-blue/50'
                                             }`}>
                                                 {imagePreview ? (
-                                                    <div className="relative w-full h-full rounded-xl overflow-hidden shadow-lg border-2 border-white">
+                                                    <div className="relative w-full h-full rounded-xl overflow-hidden shadow-sm border border-white">
                                                         <Image src={imagePreview} alt="Preview" fill className="object-cover" sizes="400px" />
                                                         <div className="absolute inset-0 bg-emerald-500/10" />
                                                     </div>
                                                 ) : (
                                                     <>
-                                                        <div className="w-12 h-12 bg-slate-50 flex items-center justify-center rounded-2xl text-slate-300 mb-3 group-hover:bg-gov-blue group-hover:text-white transition-all shadow-inner">
-                                                            <Camera size={24} />
+                                                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-slate-50 flex items-center justify-center rounded-2xl text-slate-300 mb-2 sm:mb-3 group-hover:bg-gov-blue group-hover:text-white transition-all shadow-inner">
+                                                            <Camera size={20} className="sm:w-6 sm:h-6" />
                                                         </div>
-                                                        <p className="text-xs font-black text-slate-800 uppercase tracking-tight">Upload Evidence Photo</p>
-                                                        <p className="text-[10px] text-slate-400 font-bold mt-1">PNG, JPG or JPEG max 10MB</p>
+                                                        <p className="text-[10px] sm:text-xs font-black text-slate-800 uppercase tracking-tight">Upload Evidence Photo</p>
+                                                        <p className="text-[9px] sm:text-[10px] text-slate-400 font-bold mt-1">PNG/JPG max 10MB</p>
                                                     </>
                                                 )}
                                             </div>
@@ -636,41 +649,42 @@ export default function AuthorityDashboard() {
                                         <label className="block text-[10px] text-slate-400 font-black uppercase tracking-widest px-2">Official Closing Statement</label>
                                         <textarea 
                                             placeholder="Specify actions taken to resolve this grievance..."
-                                            className="w-full h-24 p-5 bg-slate-50 border border-slate-100 rounded-2xl text-[13px] font-bold text-slate-700 outline-none focus:ring-4 focus:ring-gov-blue/5 focus:bg-white focus:border-gov-blue/20 transition-all resize-none placeholder:text-slate-300"
+                                            className="w-full h-20 sm:h-24 p-4 sm:p-5 bg-slate-50 border border-slate-100 rounded-2xl text-xs sm:text-[13px] font-bold text-slate-700 outline-none focus:ring-2 focus:ring-gov-blue/20 transition-all resize-none placeholder:text-slate-300"
                                             value={resolutionNote}
                                             onChange={(e) => setResolutionNote(e.target.value)}
                                         />
                                     </div>
 
-                                    <div className="bg-emerald-50/50 p-5 rounded-2xl border border-emerald-100 flex items-center gap-4">
-                                        <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-white shrink-0 shadow-lg shadow-emerald-500/20">
-                                            <Bell size={18} className="animate-pulse" />
+                                    <div className="bg-emerald-50/50 p-4 sm:p-5 rounded-2xl border border-emerald-100 flex items-center gap-3 sm:gap-4">
+                                        <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-white shrink-0 shadow-lg shadow-emerald-500/20">
+                                            <Bell size={16} className="animate-pulse" />
                                         </div>
                                         <div>
-                                            <p className="text-[13px] font-black text-emerald-900 leading-tight mb-0.5">Automated Broadcast</p>
-                                            <p className="text-[11px] font-bold text-emerald-700 leading-tight opacity-80">
-                                                Closing this will notify all residents in <span className="font-black underline">{selectedComplaint.ward}</span>.
+                                            <p className="text-[11px] sm:text-[13px] font-black text-emerald-900 leading-tight mb-0.5">Automated Broadcast</p>
+                                            <p className="text-[10px] sm:text-[11px] font-bold text-emerald-700 leading-tight opacity-80">
+                                                Closing this will notify all residents in <span className="font-black underline">{liveAddress}</span>.
                                             </p>
                                         </div>
                                     </div>
                                 </div>
                             )}
+                        </div>
 
-                            <div className="flex gap-4 pt-4 border-t border-slate-50">
-                                <button 
-                                    onClick={handleUpdateStatus}
-                                    disabled={isActionLoading || (newStatus === 'Resolved' && (!afterImage || !resolutionNote.trim()))}
-                                    className={`flex-1 py-4.5 rounded-2xl font-black uppercase tracking-[0.15em] text-[11px] shadow-xl transition-all flex items-center justify-center gap-3 active:scale-95 ${
-                                        newStatus === 'Resolved' && (!afterImage || !resolutionNote.trim())
-                                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none' 
-                                        : 'bg-slate-900 text-white hover:bg-gov-blue hover:shadow-gov-blue/25 hover:-translate-y-0.5'
-                                    }`}
-                                >
-                                    {isActionLoading ? 'Processing...' : (
-                                        <>Submit Official Update <ArrowRight size={16}/></>
-                                    )}
-                                </button>
-                            </div>
+                        {/* Sticky Action Button */}
+                        <div className="px-6 py-4 sm:p-8 sm:pt-4 border-t border-slate-50 bg-white/90 backdrop-blur-md">
+                            <button 
+                                onClick={handleUpdateStatus}
+                                disabled={isActionLoading || (newStatus === 'Resolved' && (!afterImage || !resolutionNote.trim()))}
+                                className={`w-full py-4 rounded-2xl font-black uppercase tracking-[0.15em] text-[10px] sm:text-[11px] shadow-xl transition-all flex items-center justify-center gap-2 sm:gap-3 active:scale-95 ${
+                                    newStatus === 'Resolved' && (!afterImage || !resolutionNote.trim())
+                                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none' 
+                                    : 'bg-slate-900 text-white hover:bg-gov-blue hover:shadow-gov-blue/25 hover:-translate-y-0.5'
+                                }`}
+                            >
+                                {isActionLoading ? 'Processing...' : (
+                                    <>Submit Official Update <ArrowRight size={16}/></>
+                                )}
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -678,52 +692,64 @@ export default function AuthorityDashboard() {
 
             {/* Official Directive Modal (Circular) */}
             {showCircularModal && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[120] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-white">
-                        <div className="bg-gov-blue p-10 text-white relative">
-                            <div className="absolute top-0 right-0 p-10 opacity-10">
-                                <ShieldCheck size={160} strokeWidth={1} />
-                            </div>
-                            <div className="relative z-10">
-                                <div className="flex items-center gap-3 mb-4">
-                                    <div className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-lg text-[10px] font-black uppercase tracking-widest">Directive #2026/04</div>
-                                    <div className="px-3 py-1 bg-red-400 rounded-lg text-[10px] font-black uppercase tracking-widest">Priority 1</div>
-                                </div>
-                                <h3 className="text-4xl font-black leading-tight tracking-tight">Official Administrative Directive</h3>
-                                <div className="flex items-center gap-6 mt-6">
-                                    <div className="flex items-center gap-2">
-                                        <User size={16} className="opacity-60" />
-                                        <span className="text-xs font-bold">Issued by: Div. Commissioner</span>
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-md z-[120] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-[32px] shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-300 border border-white">
+                        <div className="p-8 space-y-8">
+                            <div className="flex justify-between items-start">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 bg-red-50 rounded-2xl flex items-center justify-center text-red-500 shadow-inner">
+                                        <ShieldCheck className="w-6 h-6" />
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <Clock3 size={16} className="opacity-60" />
-                                        <span className="text-xs font-bold">26 March 2026</span>
+                                    <div>
+                                        <h3 className="text-2xl font-black text-slate-800 leading-tight">Official Directive</h3>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded-md text-[9px] font-black uppercase tracking-widest">Directive #2026/04</span>
+                                            <span className="px-2 py-0.5 bg-red-50 text-red-600 rounded-md text-[9px] font-black uppercase tracking-widest animate-pulse">Priority 1</span>
+                                        </div>
                                     </div>
                                 </div>
+                                <button onClick={() => setShowCircularModal(false)} className="p-2.5 hover:bg-slate-50 rounded-xl text-slate-400 transition-colors">
+                                    <X size={22} />
+                                </button>
                             </div>
-                        </div>
-                        <div className="p-10 space-y-8">
+
+                            <div className="bg-slate-50 rounded-3xl border border-slate-100 p-6 flex items-center justify-between">
+                                <div className="flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-8">
+                                    <div className="flex items-center gap-2">
+                                        <User size={16} className="text-slate-400" />
+                                        <span className="text-[11px] font-bold text-slate-600 uppercase tracking-widest">Issued by: Div. Commissioner</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Clock3 size={16} className="text-slate-400" />
+                                        <span className="text-[11px] font-bold text-slate-600 uppercase tracking-widest">26 March 2026</span>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div className="space-y-4">
-                                <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest">Subject: Urgent Intervention in Ward 42</h4>
-                                <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 text-slate-600 font-medium leading-relaxed italic">
+                                <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest">Urgent Intervention in Ward 42</h4>
+                                <div className="p-6 bg-white rounded-3xl border border-slate-100 text-slate-600 font-medium leading-relaxed italic shadow-sm relative overflow-hidden">
+                                    <div className="absolute top-0 left-0 w-1 h-full bg-red-400"></div>
                                     "Due to multiple reports of systemic infrastructure failure in Ward 42 during the current NCT modernization phase, all departmental heads are directed to prioritize grievances involving Power Grid instability and Water Main maintenance. Immediate verification of site proofs is mandatory before ticket closure."
                                 </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-6">
-                                <div className="p-5 rounded-2xl bg-orange-50 border border-orange-100">
-                                    <div className="text-[10px] font-black text-orange-600 uppercase mb-2">Primary Ward</div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="p-5 rounded-2xl bg-orange-50 border border-orange-100 flex flex-col justify-center">
+                                    <div className="text-[10px] font-black text-orange-600 uppercase mb-1">Primary Ward Target</div>
                                     <div className="text-lg font-black text-orange-900">Ward 42 (Delhi NCT)</div>
                                 </div>
-                                <div className="p-5 rounded-2xl bg-indigo-50 border border-indigo-100">
-                                    <div className="text-[10px] font-black text-indigo-600 uppercase mb-2">Compliance SLA</div>
+                                <div className="p-5 rounded-2xl bg-indigo-50 border border-indigo-100 flex flex-col justify-center">
+                                    <div className="text-[10px] font-black text-indigo-600 uppercase mb-1">Compliance SLA</div>
                                     <div className="text-lg font-black text-indigo-900">Within 24 Hours</div>
                                 </div>
                             </div>
+                            
                             <button 
                                 onClick={() => setShowCircularModal(false)}
-                                className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[11px] hover:bg-gov-blue transition-all active:scale-95 shadow-xl shadow-slate-900/10"
+                                className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-[0.2em] text-[11px] hover:bg-gov-blue transition-all active:scale-95 shadow-xl shadow-slate-900/10 flex items-center justify-center gap-2"
                             >
-                                Acknowledge Directive
+                                <CheckCircle size={16} /> Acknowledge Directive
                             </button>
                         </div>
                     </div>

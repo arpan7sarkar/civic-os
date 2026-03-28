@@ -142,6 +142,9 @@ export default function MyReportsPage() {
     const [searchTerm, setSearchTerm] = useState("");
     const searchRef = useRef<HTMLInputElement>(null);
 
+    // Resolution Proof Modal
+    const [selectedProof, setSelectedProof] = useState<Complaint | null>(null);
+
     // Error banner
     const [fetchError, setFetchError] = useState<string | null>(null);
 
@@ -474,7 +477,7 @@ export default function MyReportsPage() {
                                     </th>
                                     <th className="px-5 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
                                     <th className="px-5 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                                        <span className="flex items-center gap-1.5"><Building2 className="w-3 h-3" />Assigned To</span>
+                                        <span className="flex items-center gap-1.5"><Building2 className="w-3 h-3" />Assignment & SLA</span>
                                     </th>
                                     <th className="px-5 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">
                                         <span className="flex items-center gap-1.5"><Calendar className="w-3 h-3" />Date</span>
@@ -501,12 +504,25 @@ export default function MyReportsPage() {
                                                 <StatusBadge status={item.status} />
                                             </td>
                                             <td className="px-5 py-5 text-sm font-medium text-slate-600">
-                                                {item.assignedTo || "Department Review"}
+                                                <div className="flex flex-col">
+                                                    <span className="font-bold text-slate-800">{item.assignedDepartment || "Department Review"}</span>
+                                                    {item.slaDeadline && item.status !== 'Resolved' && (
+                                                        <span className="text-[10px] text-red-500 font-bold uppercase mt-1">SLA: {formatDate(item.slaDeadline)}</span>
+                                                    )}
+                                                </div>
                                             </td>
                                             <td className="px-5 py-5 text-xs font-medium text-slate-500 whitespace-nowrap">
                                                 {formatDate(item.createdAt)}
                                             </td>
-                                            <td className="px-5 py-5 text-right">
+                                            <td className="px-5 py-5 text-right flex gap-2 justify-end">
+                                                {item.status === 'Resolved' && (
+                                                    <button 
+                                                        onClick={() => setSelectedProof(item)}
+                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors"
+                                                    >
+                                                        <CheckCircle className="w-3.5 h-3.5" /> Verify
+                                                    </button>
+                                                )}
                                                 <button
                                                     onClick={() => generateGrievancePDF(item)}
                                                     title="Download PDF Receipt"
@@ -551,18 +567,33 @@ export default function MyReportsPage() {
                                                 <StatusBadge status={item.status} />
                                                 <span className="text-[10px] text-slate-400">{formatDate(item.createdAt)}</span>
                                             </div>
-                                            <p className="text-[10px] font-bold text-slate-500 mt-1">
-                                                {item.assignedTo || "Department Review"}
-                                            </p>
+                                            <div className="mt-2 flex items-center justify-between">
+                                                <p className="text-[10px] font-bold text-slate-500">
+                                                    {item.assignedDepartment || "Department Review"}
+                                                </p>
+                                                {item.slaDeadline && item.status !== 'Resolved' && (
+                                                    <span className="text-[9px] text-red-500 font-black uppercase bg-red-50 px-2 py-0.5 rounded-md">SLA: {formatDate(item.slaDeadline)}</span>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
-                                    <button
-                                        onClick={() => generateGrievancePDF(item)}
-                                        title="Download PDF"
-                                        className="p-2 hover:bg-gov-blue/5 rounded-lg text-slate-400 hover:text-gov-blue transition-colors flex-shrink-0"
-                                    >
-                                        <FileDown className="w-4 h-4" />
-                                    </button>
+                                    <div className="flex flex-col gap-2 flex-shrink-0">
+                                        <button
+                                            onClick={() => generateGrievancePDF(item)}
+                                            title="Download PDF"
+                                            className="p-2 bg-slate-50 hover:bg-gov-blue/5 rounded-lg text-slate-400 hover:text-gov-blue transition-colors flex items-center justify-center"
+                                        >
+                                            <FileDown className="w-4 h-4" />
+                                        </button>
+                                        {item.status === 'Resolved' && (
+                                            <button 
+                                                onClick={() => setSelectedProof(item)}
+                                                className="p-2 bg-emerald-50 hover:bg-emerald-100 rounded-lg text-emerald-600 transition-colors flex items-center justify-center"
+                                            >
+                                                <CheckCircle className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             ))
                         ) : (
@@ -610,6 +641,63 @@ export default function MyReportsPage() {
                     )}
                 </div>
             </main>
+
+            {/* Resolution Proof Modal */}
+            {selectedProof && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setSelectedProof(null)} />
+                    <div className="bg-white rounded-3xl w-full max-w-2xl relative z-10 overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
+                        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                            <div>
+                                <h2 className="text-xl font-black text-slate-800">Resolution Verification</h2>
+                                <p className="text-sm text-slate-500 font-medium">Ticket #{selectedProof.id.slice(0, 8)} • Resolved by {selectedProof.resolvedByName || "Authority"}</p>
+                            </div>
+                            <button onClick={() => setSelectedProof(null)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+                                <X className="w-5 h-5 text-slate-400" />
+                            </button>
+                        </div>
+                        <div className="p-6 bg-slate-50">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Before</span>
+                                        <span className="text-[10px] font-bold text-slate-400">{formatDate(selectedProof.createdAt)}</span>
+                                    </div>
+                                    <div className="aspect-video relative rounded-2xl overflow-hidden bg-slate-200 border border-slate-200">
+                                        {selectedProof.citizenPhoto ? (
+                                            <img src={`https://sgp.cloud.appwrite.io/v1/storage/buckets/67d6a5ee000ab6feab26/files/${selectedProof.citizenPhoto}/view?project=civicos-app`} alt="Before" className="object-cover w-full h-full" />
+                                        ) : (
+                                            <div className="flex items-center justify-center w-full h-full text-slate-400 text-xs font-bold">No Photo Provided</div>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">After Resolution</span>
+                                        <span className="text-[10px] font-bold text-emerald-600">{formatDate(selectedProof.resolvedAt)}</span>
+                                    </div>
+                                    <div className="aspect-video relative rounded-2xl overflow-hidden bg-emerald-50 border border-emerald-100">
+                                        {selectedProof.afterImageUrl ? (
+                                            <img src={`https://sgp.cloud.appwrite.io/v1/storage/buckets/67d6a5ee000ab6feab26/files/${selectedProof.afterImageUrl}/view?project=civicos-app`} alt="After" className="object-cover w-full h-full" />
+                                        ) : (
+                                            <div className="flex items-center justify-center w-full h-full text-emerald-500 transition-colors text-xs font-bold">Official Resolution Note</div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="mt-8 flex gap-3">
+                                <button className="flex-1 py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-2" onClick={() => setSelectedProof(null)}>
+                                    <CheckCircle className="w-4 h-4" /> Yes, Fully Resolved
+                                </button>
+                                <button className="flex-1 py-4 bg-white border border-red-200 text-red-500 hover:bg-red-50 rounded-xl text-[10px] font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-2" onClick={() => setSelectedProof(null)}>
+                                    <AlertCircle className="w-4 h-4" /> No, Reopen Issue
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -632,6 +720,10 @@ function normalizeGrievance(doc: any): Complaint {
         createdAt: doc.createdAt || doc.$createdAt,
         citizenPhoto: doc.citizenPhoto,
         repairPhoto: doc.repairPhoto,
+        afterImageUrl: doc.afterImageUrl,
+        slaDeadline: doc.slaDeadline,
+        assignedDepartment: doc.assignedDepartment,
+        resolvedAt: doc.resolvedAt,
     } as Complaint;
 }
 
