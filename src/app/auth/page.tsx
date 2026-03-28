@@ -13,7 +13,8 @@ import {
     CheckCircle2,
     Building2,
     Check,
-    Loader2
+    Loader2,
+    Mail
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -59,8 +60,8 @@ export default function AuthGatewayPage() {
         setError('');
         setSuccess('');
         setIsSuccess(false);
-        if (!mobile || !/^\d{10}$/.test(mobile)) {
-            setError('Please enter a valid 10-digit mobile number');
+        if (!mobile || !mobile.includes('@')) {
+            setError('Please enter a valid email address');
             return;
         }
 
@@ -219,26 +220,23 @@ export default function AuthGatewayPage() {
                                 className="space-y-6"
                             >
                             <div className="space-y-2">
-                                <label htmlFor="mobile" className="text-xs font-black text-slate-700 uppercase tracking-widest px-1">Mobile Number</label>
-                                <div className="flex group relative">
-                                    <span className="inline-flex items-center px-4 rounded-l-2xl border border-r-0 border-slate-200 bg-slate-50 text-slate-500 font-black transition-all group-focus-within:border-primary group-focus-within:bg-white group-focus-within:text-primary">
-                                        +91
-                                    </span>
-                                    <input
-                                        id="mobile"
-                                        type="tel"
-                                        maxLength={10}
-                                        value={mobile}
-                                        onChange={(e) => setMobile(e.target.value.replace(/\D/g, ''))}
-                                        aria-label="Enter 10 digit mobile number"
-                                        className="block w-full rounded-r-2xl border border-slate-200 px-5 py-5 text-slate-900 text-xl font-black placeholder:text-slate-200 focus:border-primary focus:ring-8 focus:ring-primary/5 outline-none transition-all shadow-sm group-hover:border-slate-300"
-                                        placeholder="98765 43210"
-                                    />
-                                    <div className="absolute inset-y-0 right-4 flex items-center text-slate-300">
-                                        <RefreshCw className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
+                                <label htmlFor="mobile" className="text-xs font-black text-slate-700 uppercase tracking-widest px-1">
+                                    Email Address
+                                </label>
+                                <div className="relative group">
+                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors">
+                                        <Mail size={20} />
                                     </div>
+                                    <input
+                                        type="email"
+                                        value={mobile}
+                                        onChange={(e) => setMobile(e.target.value)}
+                                        placeholder="Enter your email address"
+                                        className="w-full bg-white/50 backdrop-blur-sm border border-gray-200 rounded-xl py-4 pl-12 pr-4 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-gray-900 placeholder:text-gray-400"
+                                        disabled={isLoading}
+                                    />
                                 </div>
-                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider px-1 opacity-60">Enter your registered mobile number for secure access.</p>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider px-1 opacity-60">Authentication via Email OTP is now active.</p>
                             </div>
 
                             <div className="flex items-center justify-center py-2">

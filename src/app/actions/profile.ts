@@ -7,6 +7,7 @@ import { env } from '@/lib/env';
 import { InputFile } from 'node-appwrite/file';
 import { Schemas, sanitizeString } from "@/lib/security";
 import { standardLimiter, getClientIp } from "@/lib/ratelimit";
+import { getCachedProfile, setCachedProfile, invalidateProfileCache } from "@/lib/cache";
 
 export interface UserProfile {
     userId: string;
@@ -40,34 +41,52 @@ export async function getServerProfileAction() {
         
         // 1. HARDCODED ROLE for Official User (Bypass DB if needed)
         if (user.email === 'bs922268@gmail.com') {
+            const officialProfile = {
+                userId: user.$id,
+                name: user.name || "Commissioner Bishal",
+                email: user.email,
+                role: 'authority',
+                address: "Delhi Municipal HQ",
+                govIdType: "PAN",
+                govIdNumber: "OFFICIAL999",
+                profileImageUrl: ""
+            };
             return JSON.parse(JSON.stringify({ 
                 success: true, 
                 isFullProfile: true, 
-                profile: {
-                    userId: user.$id,
-                    name: user.name || "Commissioner Bishal",
-                    email: user.email,
-                    role: 'authority',
-                    address: "Delhi Municipal HQ",
-                    govIdType: "PAN",
-                    govIdNumber: "OFFICIAL999",
-                    profileImageUrl: ""
-                }
+                profile: officialProfile
             }));
         }
+
+        // 1.5 CHECK CACHE FIRST
+        const cached = await getCachedProfile(user.$id);
+        if (cached) {
+            return JSON.parse(JSON.stringify({ 
+                success: true, 
+                isFullProfile: true, 
+                profile: cached 
+            }));
+        }
+
         try {
             // 2. Fetch profile from collection (Direct ID Lookup first, then List)
             let profileDoc;
             try {
-                profileDoc = await databases.getDocument(DATABASE_ID, PROFILES_COLLECTION_ID, user.$id);
+                // v23 Object Style
+                profileDoc = await databases.getDocument({
+                    databaseId: DATABASE_ID, 
+                    collectionId: PROFILES_COLLECTION_ID, 
+                    documentId: user.$id
+                });
                 console.log(`[PROFILE_SERVER_V7] Direct ID lookup success for ${user.$id}.`);
             } catch (e) {
                 console.log(`[PROFILE_SERVER_V7] Direct ID lookup failed for ${user.$id}, falling back to list query.`);
-                const profileList = await databases.listDocuments(
-                    DATABASE_ID,
-                    PROFILES_COLLECTION_ID,
-                    [Query.equal('userId', user.$id), Query.limit(1)]
-                );
+                // v23 Object Style
+                const profileList = await databases.listDocuments({
+                    databaseId: DATABASE_ID,
+                    collectionId: PROFILES_COLLECTION_ID,
+                    queries: [Query.equal('userId', user.$id), Query.limit(1)]
+                });
                 if (profileList.documents.length > 0) {
                     profileDoc = profileList.documents[0];
                 }
@@ -103,6 +122,10 @@ export async function getServerProfileAction() {
                 // Hardcoded role for the specific test user
                 role: (user.email === 'bs922268@gmail.com') ? 'authority' : (doc.role || 'citizen')
             };
+
+            // UPDATE CACHE
+            await setCachedProfile(user.$id, profile);
+
             return JSON.parse(JSON.stringify({ 
                 success: true, 
                 isFullProfile: true, 
@@ -167,6 +190,9 @@ export async function updateUserProfileAction(data: Partial<UserProfile>) {
             rowId: data.userId as string, // Directly use userId as rowId
             data: safeProfile
         });
+
+        // INVALIDATE CACHE
+        await invalidateProfileCache(data.userId);
 
         return JSON.parse(JSON.stringify({ success: true, profile: result }));
     } catch (error: any) {
@@ -241,6 +267,9 @@ export async function createProfileWithImageAction(formData: FormData) {
                 Permission.delete(Role.user(userId)),
             ]
         });
+
+        // INVALIDATE CACHE (or set)
+        await invalidateProfileCache(userId);
 
         return JSON.parse(JSON.stringify({ success: true, data: result }));
     } catch (error: any) {

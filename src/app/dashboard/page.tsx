@@ -143,6 +143,14 @@ export default function CitizenDashboard() {
         radius: 1.5 // km
     });
 
+    const formatDate = (dateStr?: string) => {
+        if (!dateStr) return "Just Now";
+        return new Date(dateStr).toLocaleDateString('en-IN', {
+            day: 'numeric', month: 'short', year: 'numeric',
+            hour: '2-digit', minute: '2-digit'
+        });
+    };
+
     const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
         const R = 6371; // km
         const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -818,6 +826,47 @@ export default function CitizenDashboard() {
                             Contact Support
                         </a>
                     </div>
+                    
+                    {/* Hyperlocal Notification Engine */}
+                    {nearbyResolutions.length > 0 && (
+                        <div className="bg-emerald-50 border border-emerald-100 rounded-3xl p-6 shadow-sm overflow-hidden relative group">
+                            <div className="flex items-center gap-3 mb-6">
+                                <div className="p-3 bg-white text-emerald-600 rounded-2xl shadow-sm">
+                                    <MapPin className="w-6 h-6" />
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-black text-emerald-900 leading-none">Resolved Near You</h2>
+                                    <p className="text-[10px] text-emerald-600 font-black uppercase tracking-widest mt-1">Within {nearbyStats.radius}km of your location</p>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                {nearbyResolutions.slice(0, 3).map(res => (
+                                    <div key={res.id} className="p-5 bg-white border border-emerald-50 rounded-2xl flex flex-col gap-3 shadow-sm hover:shadow-md transition-all">
+                                        <div className="flex items-center justify-between">
+                                            <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest rounded-lg">Verified Fix</span>
+                                            <span className="text-[10px] font-bold text-slate-400">{formatDate(res.resolvedAt || res.createdAt)}</span>
+                                        </div>
+                                        <div className="flex-1">
+                                            <h3 className="text-sm font-bold text-slate-800">{res.category}</h3>
+                                            <p className="text-xs text-slate-500 font-medium line-clamp-2 mt-1">{res.description}</p>
+                                            <p className="text-[10px] font-bold text-gov-blue mt-2 truncate">{res.ward}</p>
+                                        </div>
+                                        <button 
+                                            onClick={() => {
+                                                setSelectedResolution(res);
+                                                setShowProofModal(true);
+                                            }}
+                                            className="w-full py-2.5 bg-slate-50 border border-slate-100 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:border-emerald-200 hover:text-emerald-700 hover:bg-emerald-50 transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            <ShieldCheck className="w-3.5 h-3.5" /> View Proof
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+
 
                     {/* Live Feed Table Section */}
                     <div className="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden p-4 md:p-8">
@@ -1107,8 +1156,8 @@ export default function CitizenDashboard() {
                                         <ShieldCheck className="w-6 h-6" />
                                     </div>
                                     <div>
-                                        <h2 className="text-xl font-black text-slate-800">Resolution Proof-of-Work</h2>
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ticket #{selectedResolution.id}</p>
+                                        <h2 className="text-xl font-black text-slate-800">Resolution Evidence</h2>
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ticket #{selectedResolution.id.slice(0, 8)}</p>
                                     </div>
                                 </div>
                                 <button 
