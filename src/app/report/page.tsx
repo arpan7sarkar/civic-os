@@ -20,14 +20,19 @@ import {
 } from "lucide-react";
 import { useRef } from "react";
 import Link from "next/link";
-import { analyzeIssueAction, transcribeAudioAction } from "@/app/actions/ai";
+import { analyzeIssueAction, transcribeAudioAction, textToSpeechAction } from "@/app/actions/ai";
+
 import { reverseGeocodeAction, getAutocompleteSuggestionsAction } from "@/app/actions/geo";
 import { uploadGrievanceImageAction, createGrievanceAction } from "@/app/actions/grievance";
+import { parseVoiceReportTurnAction } from "@/app/actions/voice";
+
 import { saveComplaint, getComplaints } from "@/lib/store";
 import { getServerProfileAction } from "@/app/actions/profile";
 import { ComplaintCategory, Priority } from "@/lib/types";
 import { generateGrievancePDF } from "@/lib/pdf";
+import { VoiceDraft, VoiceTurnOutput } from "@/lib/voice";
 import BottomNav from "@/components/BottomNav";
+
 import dynamic from "next/dynamic";
 
 const MapComponent = dynamic(() => import("@/components/MapComponent"), { 
@@ -68,7 +73,18 @@ export default function ReportPage() {
     const [imagePreview, setImagePreview] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Voice State
+    // Autopilot State
+    const [autopilotMode, setAutopilotMode] = useState(false);
+    const [autopilotState, setAutopilotState] = useState<'idle' | 'listening' | 'transcribing' | 'extracting' | 'resolving-location' | 'awaiting-confirmation' | 'submitting' | 'success' | 'error'>('idle');
+    const [voiceDraft, setVoiceDraft] = useState<VoiceDraft>({
+        confirmationState: 'none'
+    });
+    const [nextAiPrompt, setNextAiPrompt] = useState<string>("");
+    const [lastTranscript, setLastTranscript] = useState("");
+    const [isMuted, setIsMuted] = useState(false);
+
+
+    // Voice State (Legacy + Autopilot shared)
     const [isRecording, setIsRecording] = useState(false);
     const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
     const [isTranscribing, setIsTranscribing] = useState(false);
@@ -98,6 +114,20 @@ export default function ReportPage() {
             }
         });
     }, [router]);
+
+    // TTS Effect for Autopilot
+    useEffect(() => {
+        if (nextAiPrompt && autopilotMode && !isMuted) {
+            textToSpeechAction(nextAiPrompt).then((audios: string[]) => {
+                if (audios && audios.length > 0) {
+                    const base64 = audios[0];
+                    const audio = new Audio(`data:audio/wav;base64,${base64}`);
+                    audio.play().catch(e => console.warn("Audio play blocked:", e));
+                }
+            }).catch((err: any) => console.error("TTS failed:", err));
+        }
+    }, [nextAiPrompt, autopilotMode, isMuted]);
+
 
     const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         setDescription(e.target.value);
@@ -130,20 +160,36 @@ export default function ReportPage() {
                 reader.readAsDataURL(blob);
                 reader.onloadend = async () => {
                     const base64Audio = (reader.result as string).split(',')[1];
-                    setIsTranscribing(true);
+                    
+                    if (autopilotMode) {
+                        setAutopilotState('transcribing');
+                    } else {
+                        setIsTranscribing(true);
+                    }
+
                     try {
                         const response = await transcribeAudioAction(base64Audio);
                         if (response && response.transcript) {
-                            setDescription(response.transcript);
-                            // Auto-analyze after transcription
-                            const analysis = await analyzeIssueAction(response.transcript);
-                            setAiResult(analysis);
-                            setStep(2);
+                            console.log(`[Autopilot Telemetry] STT_SUCCESS: "${response.transcript}"`);
+                            if (autopilotMode) {
+                                setLastTranscript(response.transcript);
+                                await processVoiceTurn(response.transcript);
+                            } else {
+                                setDescription(response.transcript);
+                                // Auto-analyze after transcription (Legacy one-shot)
+                                const analysis = await analyzeIssueAction(response.transcript);
+                                setAiResult(analysis);
+                                setStep(2);
+                            }
                         }
                     } catch (err) {
                         console.error("Transcription failed:", err);
+                        if (autopilotMode) setAutopilotState('error');
                     } finally {
                         setIsTranscribing(false);
+                        if (autopilotMode && autopilotState === 'transcribing') {
+                            // State will be updated by processVoiceTurn
+                        }
                     }
                 };
             };
@@ -151,8 +197,127 @@ export default function ReportPage() {
             recorder.start();
             setMediaRecorder(recorder);
             setIsRecording(true);
+            if (autopilotMode) setAutopilotState('listening');
         } catch (err) {
             console.error("Microphone access denied:", err);
+            if (autopilotMode) setAutopilotState('error');
+        }
+    };
+
+    const processVoiceTurn = async (transcript: string) => {
+        setAutopilotState('extracting');
+        console.log(`[Autopilot Telemetry] START_EXTRACTING turn with transcript: "${transcript}"`);
+        try {
+            const result = await parseVoiceReportTurnAction({
+                transcript,
+                currentDraft: voiceDraft
+            });
+
+            if (result.success && result.data) {
+                const turnData = result.data as VoiceTurnOutput;
+                console.log(`[Autopilot Telemetry] PARSE_SUCCESS intents: ${turnData.intents.join(', ')}`);
+                
+                // Deterministic Merge (PRD 11.4.2)
+                let newDraft = {
+                    ...voiceDraft,
+                    ...turnData.draftPatch
+                };
+                
+                setVoiceDraft(newDraft);
+                setNextAiPrompt(turnData.nextPrompt);
+
+                // Check Intents
+                if (turnData.intents.includes('request_gps')) {
+                    setAutopilotState('resolving-location');
+                    await detectLocation();
+                    return; // detectLocation updates state and results
+                }
+
+                // Location Resolution Branch
+                if (newDraft.locationText && !newDraft.lat) {
+                    setAutopilotState('resolving-location');
+                    try {
+                        const geoResult = await getAutocompleteSuggestionsAction(newDraft.locationText);
+                        if (geoResult.success && geoResult.suggestions && geoResult.suggestions.length > 0) {
+                            const top = geoResult.suggestions[0];
+                            
+                            // Apply resolution to UI
+                            setCoords({ lat: top.lat, lng: top.lon });
+                            setLocation(top.formatted);
+                            setIsLocationSelected(true);
+                            
+                            // Re-merge with resolved data
+                            newDraft = {
+                                ...newDraft,
+                                lat: top.lat,
+                                lng: top.lon,
+                                locationText: top.formatted
+                            };
+                            setVoiceDraft(newDraft);
+                            
+                            // Special confirmation prompt for resolved address
+                            setNextAiPrompt(`मैंने आपकी लोकेशन '${top.formatted}' के रूप में सेट कर दी है। क्या यह सही है? (I've set your location to ${top.formatted}. Is that correct?)`);
+                        } else {
+                            setNextAiPrompt("मुझे वह जगह नहीं मिल रही है। क्या आप दोबारा पता बता सकते हैं? (I can't find that place. Can you specify the address again?)");
+                        }
+                    } catch (geoErr) {
+                        console.error("Geo resolution failed:", geoErr);
+                        setNextAiPrompt("लोकेशन पता करने में समस्या हो रही है। कृपया मैन्युअल रूप से टाइप करें। (Error resolving location. Please type manually.)");
+                    }
+                }
+
+                // Final Readiness check (calculated early for logic gates)
+                const isReady = !!(newDraft.description && 
+                                newDraft.category && 
+                                newDraft.lat && 
+                                newDraft.lng);
+
+                if (isReady) {
+                    // Transition to summary step so user sees what is being sent
+                    setStep(2);
+                    setAiResult({
+                        category: (newDraft.category as ComplaintCategory) || 'Other',
+                        priority: (newDraft.priority as Priority) || 'Medium',
+                        department: newDraft.department || 'General Administration',
+                        suggestedAction: "Voice verified submission.",
+                        refinedDescription: newDraft.description || transcript
+                    });
+
+                    // AUTOMATIC SUBMISSION (User Requirement: "it should do automatic report uploading")
+                    console.log(`[Autopilot Telemetry] AUTO_TRIGGER_SUBMIT`);
+                    setAutopilotState('submitting');
+                    setNextAiPrompt("सारे विवरण मिल गए हैं। आपकी रिपोर्ट अपने आप जमा हो रही है... (All details captured. Automatically submitting your report...)");
+                    
+                    // Call with latest turn data to bypass React state sync delay
+                    const currentAiResult = {
+                        category: (newDraft.category as ComplaintCategory) || 'Other',
+                        priority: (newDraft.priority as Priority) || 'Medium',
+                        department: newDraft.department || 'General Administration',
+                        suggestedAction: "Voice verified submission.",
+                        refinedDescription: newDraft.description || transcript
+                    };
+
+                    await handleSubmit({
+                        lat: newDraft.lat,
+                        lng: newDraft.lng,
+                        locationText: newDraft.locationText,
+                        aiResult: currentAiResult,
+                        userId: userId || undefined
+                    });
+                    return;
+                } else {
+                    console.log(`[Autopilot Telemetry] TURN_CONTINUE missing: ${turnData.missingFields.join(', ')}`);
+                    setAutopilotState('idle');
+                }
+            } else {
+                console.warn(`[Autopilot Telemetry] PARSE_FAILURE`);
+                setAutopilotState('error');
+                setNextAiPrompt("क्षमा करें, मुझे समझ नहीं आया। क्या आप दोबारा कह सकते हैं? (Sorry, I didn't catch that. Could you repeat?)");
+            }
+        } catch (err) {
+            console.error("[Autopilot Telemetry] TURN_CRITICAL_ERROR:", err);
+            setAutopilotState('error');
+            setNextAiPrompt("तकनीकी समस्या आ गई है। कृपया मैन्युअल रूप से जारी रखें। (A technical error occurred. Please continue manually.)");
         }
     };
 
@@ -164,42 +329,77 @@ export default function ReportPage() {
         }
     };
 
-    const detectLocation = () => {
-        setIsDetecting(true);
-        setIsLocationSelected(false);
-        if ("geolocation" in navigator) {
-            navigator.geolocation.getCurrentPosition(
-                async (position) => {
-                    const { latitude, longitude } = position.coords;
-                    setCoords({ lat: latitude, lng: longitude });
-                    
-                    try {
-                        const res = await reverseGeocodeAction(latitude, longitude);
-                        if (res.success && res.address) {
-                            setLocation(res.address);
+    const detectLocation = (): Promise<boolean> => {
+        return new Promise((resolve) => {
+            setIsDetecting(true);
+            setIsLocationSelected(false);
+            if ("geolocation" in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    async (position) => {
+                        const { latitude, longitude } = position.coords;
+                        setCoords({ lat: latitude, lng: longitude });
+                        
+                        try {
+                            const res = await reverseGeocodeAction(latitude, longitude);
+                            let resolvedAddress = "";
+                            if (res.success && res.address) {
+                                resolvedAddress = res.address;
+                            } else {
+                                resolvedAddress = `Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`;
+                            }
+                            
+                            setLocation(resolvedAddress);
                             setIsLocationSelected(true);
-                        } else {
-                            setLocation(`Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`);
+
+                            // Sync with Voice Autopilot if active
+                            if (autopilotMode) {
+                                setVoiceDraft(prev => ({
+                                    ...prev,
+                                    lat: latitude,
+                                    lng: longitude,
+                                    locationText: resolvedAddress
+                                }));
+
+                                // Check if we are ready for submission
+                                const isDraftReady = voiceDraft.description && voiceDraft.category;
+                                if (isDraftReady) {
+                                    setAutopilotState('awaiting-confirmation');
+                                    setNextAiPrompt(`मैंने आपकी GPS लोकेशन ले ली है। आपकी रिपोर्ट सबमिट करने के लिए तैयार है। क्या मैं इसे भेज दूँ? (I've captured your GPS location. Your report is ready. Should I submit it?)`);
+                                } else {
+                                    setNextAiPrompt("मैने आपकी GPS लोकेशन ले ली है। कृपया अब समस्या का विवरण दें। (I've captured your GPS location. Please describe the issue now.)");
+                                    setAutopilotState('idle');
+                                }
+                            }
+                            resolve(true);
+                        } catch (err) {
+                            const fallback = `Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`;
+                            setLocation(fallback);
                             setIsLocationSelected(true);
+                            if (autopilotMode) {
+                                setVoiceDraft(prev => ({ ...prev, lat: latitude, lng: longitude, locationText: fallback }));
+                                setAutopilotState('idle');
+                            }
+                            resolve(true);
+                        } finally {
+                            setIsDetecting(false);
                         }
-                    } catch (err) {
-                        setLocation(`Lat: ${latitude.toFixed(4)}, Lng: ${longitude.toFixed(4)}`);
-                        setIsLocationSelected(true);
-                    } finally {
+                    },
+                    (error) => {
+                        console.error("GPS Error:", error);
+                        setLocation("");
                         setIsDetecting(false);
-                    }
-                },
-                (error) => {
-                    console.error("GPS Error:", error);
-                    setLocation("");
-                    setIsDetecting(false);
-                },
-                { enableHighAccuracy: true }
-            );
-        } else {
-            setLocation("Geolocation not supported");
-            setIsDetecting(false);
-        }
+                        if (autopilotMode) setAutopilotState('error');
+                        resolve(false);
+                    },
+                    { enableHighAccuracy: true }
+                );
+            } else {
+                setLocation("Geolocation not supported");
+                setIsDetecting(false);
+                if (autopilotMode) setAutopilotState('error');
+                resolve(false);
+            }
+        });
     };
 
     // Handle autocomplete fetching
@@ -247,6 +447,20 @@ export default function ReportPage() {
         }
     };
 
+    const handleSubmit = async (arg?: React.FormEvent | React.MouseEvent | { lat?: number, lng?: number, locationText?: string, aiResult?: any, userId?: string }) => {
+        if (isSubmitting) return;
+
+        // Distinguish between a UI event and an Autopilot override object
+        const overrides = (arg && !(arg as any).nativeEvent) ? (arg as any) : {};
+
+        // Prioritize overrides over state for synchronous Autopilot calls
+        const finalLat = overrides.lat ?? coords.lat;
+        const finalLng = overrides.lng ?? coords.lng;
+        const finalLocation = overrides.locationText ?? location;
+        const finalAiResult = overrides.aiResult ?? aiResult;
+        const finalUserId = overrides.userId ?? userId;
+
+        if (!finalUserId || !finalAiResult) return;
     const startCamera = async () => {
         try {
             const mediaStream = await navigator.mediaDevices.getUserMedia({ 
@@ -316,17 +530,17 @@ export default function ReportPage() {
             // 2. Save to Appwrite
             const appwriteRes = await createGrievanceAction({
                 id: newTicketId,
-                description: aiResult.refinedDescription, // Use sanitized English version
-                rawDescription: description, // Optionally store raw input for audit
-                category: aiResult.category,
-                priority: aiResult.priority,
-                department: aiResult.department,
-                lat: coords.lat || 28.7041,
-                lng: coords.lng || 77.1025,
+                description: finalAiResult.refinedDescription, 
+                rawDescription: description, 
+                category: finalAiResult.category,
+                priority: finalAiResult.priority,
+                department: finalAiResult.department,
+                lat: finalLat,
+                lng: finalLng,
                 status: 'Pending',
                 assignedTo: 'Processing',
-                ward: location.split(',')[0] || 'National Zone',
-                userId,
+                ward: finalLocation.split(',')[0] || 'National Zone',
+                userId: finalUserId,
                 citizenPhoto: photoId
             });
 
@@ -340,24 +554,26 @@ export default function ReportPage() {
             // 3. Fallback/Sync to local storage for existing dashboard components
             await saveComplaint({
                 id: newTicketId,
-                description: aiResult.refinedDescription, // Use sanitized English version
-                category: aiResult.category,
-                priority: aiResult.priority,
-                department: aiResult.department,
-                lat: coords.lat || 28.7041,
-                lng: coords.lng || 77.1025,
+                description: finalAiResult.refinedDescription, 
+                category: finalAiResult.category,
+                priority: finalAiResult.priority,
+                department: finalAiResult.department,
+                lat: finalLat,
+                lng: finalLng,
                 status: 'Pending',
                 assignedTo: 'Processing',
                 createdAt: new Date().toISOString(),
-                ward: location.split(',')[0] || 'National Zone',
-                userId,
+                ward: finalLocation.split(',')[0] || 'National Zone',
+                userId: finalUserId,
                 citizenPhoto: photoId
             });
 
             setTicketId(newTicketId);
             setStep(3);
+            if (autopilotMode) setAutopilotState('success');
         } catch (err) {
             console.error("Submission failed:", err);
+            if (autopilotMode) setAutopilotState('error');
         } finally {
             setIsSubmitting(false);
         }
@@ -445,11 +661,18 @@ export default function ReportPage() {
                             </button>
 
                             <button 
-                                onClick={isRecording ? stopRecording : startRecording}
+                                onClick={() => {
+                                    if (isRecording) {
+                                        stopRecording();
+                                    } else {
+                                        setAutopilotMode(true);
+                                        startRecording();
+                                    }
+                                }}
                                 disabled={isAnalyzing || isTranscribing}
-                                className={`w-full sm:w-16 h-16 rounded-2xl flex items-center justify-center transition-all ${isRecording ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                                className={`w-full sm:w-16 h-16 rounded-2xl flex items-center justify-center transition-all ${isRecording ? 'bg-red-500 text-white animate-pulse shadow-lg shadow-red-200' : 'bg-gov-blue text-white hover:bg-gov-blue/90 shadow-lg shadow-gov-blue/20'}`}
                             >
-                                {isTranscribing ? (
+                                {isTranscribing || autopilotState === 'transcribing' || autopilotState === 'extracting' ? (
                                     <Loader2 className="w-6 h-6 animate-spin" />
                                 ) : isRecording ? (
                                     <div className="flex items-center gap-2">
@@ -459,11 +682,70 @@ export default function ReportPage() {
                                 ) : (
                                     <div className="flex items-center gap-2">
                                         <Mic className="w-6 h-6" />
-                                        <span className="sm:hidden font-black text-xs uppercase">Voice Report</span>
+                                        <span className="sm:hidden font-black text-xs uppercase">Start Autopilot</span>
                                     </div>
                                 )}
                             </button>
                         </div>
+
+                        {/* Autopilot Status Panel */}
+                        {autopilotMode && (
+                            <div className="mt-8 bg-white border border-slate-100 rounded-3xl p-6 shadow-sm animate-in slide-in-from-top-4 duration-500">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-2">
+                                        <div className={`w-2 h-2 rounded-full ${autopilotState === 'listening' ? 'bg-red-500 animate-ping' : 'bg-gov-blue'}`} />
+                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Voice Autopilot: {autopilotState}</span>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                        <button 
+                                            onClick={() => setIsMuted(!isMuted)}
+                                            className="text-[10px] font-black text-slate-400 hover:text-slate-600 uppercase tracking-widest"
+                                        >
+                                            {isMuted ? "Unmute" : "Mute"}
+                                        </button>
+                                        <button 
+                                            onClick={() => {
+                                                setAutopilotMode(false);
+                                                setAutopilotState('idle');
+                                            }}
+                                            className="text-[10px] font-black text-slate-400 hover:text-slate-600 uppercase tracking-widest"
+                                        >
+                                            Exit
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {nextAiPrompt && (
+                                    <div className="bg-slate-50 rounded-2xl p-4 border border-slate-50 mb-4">
+                                        <p className="text-sm font-bold text-slate-800 leading-relaxed italic">"{nextAiPrompt}"</p>
+                                    </div>
+                                )}
+
+                                {lastTranscript && (
+                                    <div className="flex items-center gap-2 text-[10px] text-slate-400 font-bold mb-4">
+                                        <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                                        Heard: "{lastTranscript}"
+                                    </div>
+                                )}
+
+                                <div className="flex flex-wrap gap-2">
+                                    {voiceDraft.description && <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-100">Description Added</span>}
+                                    {voiceDraft.category && <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-100">{voiceDraft.category}</span>}
+                                    {voiceDraft.locationText && <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-emerald-100">Location Added</span>}
+                                </div>
+                                
+                                {autopilotState === 'awaiting-confirmation' && (
+                                    <div className="mt-6">
+                                        <button 
+                                           onClick={() => setStep(2)}
+                                           className="w-full py-3 bg-gov-blue text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-gov-blue/20 hover:-translate-y-0.5 transition-all"
+                                        >
+                                            Verify Details & Location
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -471,7 +753,7 @@ export default function ReportPage() {
                     <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                         {submitError && (
                             <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center gap-3 text-red-700 text-xs font-bold animate-in shake-1">
-                                <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                                <AlertCircle className="w-5 h-5 shrink-0" />
                                 {submitError}
                             </div>
                         )}

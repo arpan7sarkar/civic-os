@@ -355,7 +355,7 @@ export default function MyReportsPage() {
                     <div className="flex-1" />
 
                     {/* User pill */}
-                    <div className="flex items-center gap-2 pl-3 border-l border-slate-200">
+                    {/* <div className="flex items-center gap-2 pl-3 border-l border-slate-200">
                         <div className="w-8 h-8 rounded-xl overflow-hidden shadow bg-slate-100 flex items-center justify-center text-slate-400 flex-shrink-0">
                             {userProfile?.profileImageUrl ? (
                                 <Image
@@ -375,7 +375,7 @@ export default function MyReportsPage() {
                         <p className="text-sm font-black text-slate-800 hidden sm:block leading-none truncate max-w-[120px]">
                             {userProfile?.name ?? "Citizen"}
                         </p>
-                    </div>
+                    </div> */}
                 </header>
 
                 {/* Page title + search */}
